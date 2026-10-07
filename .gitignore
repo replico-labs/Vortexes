@@ -1,0 +1,6 @@
+target/
+test-ledger/
+.anchor/
+# Program keypairs decide the deployed addresses: keep them out of git.
+keys/
+*-keypair.json

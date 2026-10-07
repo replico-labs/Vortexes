@@ -1,0 +1,24 @@
+[toolchain]
+anchor_version = "1.2.1"
+solana_version = "4.3.0"
+
+[features]
+resolution = true
+skip-lint = false
+
+[workspace]
+members = ["programs/token-weighted"]
+
+# Placeholder IDs: run `anchor keys sync` before the first deploy.
+[programs.localnet]
+vortex_token_weighted = "HGy7TqBWCxacyVoznw4UciYdcdwpmJ7JdCoZu8XTTHQ"
+
+[programs.devnet]
+vortex_token_weighted = "HGy7TqBWCxacyVoznw4UciYdcdwpmJ7JdCoZu8XTTHQ"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[scripts]
+test = "cargo test"

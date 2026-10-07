@@ -1,0 +1,24 @@
+[package]
+name = "vortex-tests"
+description = "End-to-end tests: the compiled programs running in LiteSVM with the real SPL Token program."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dev-dependencies]
+anchor-lang = { workspace = true }
+litesvm = "0.17.0"
+litesvm-token = "0.17.0"
+solana-keypair = "3.1.2"
+solana-signer = "3.0.1"
+solana-message = "4.2.4"
+solana-transaction = { version = "4.1.5", features = ["verify"] }
+solana-instruction = "*"
+solana-instruction-error = "*"
+solana-clock = "*"
+solana-system-interface = { version = "*", features = ["bincode"] }
+spl-token-interface = "*"
+spl-token-2022-interface = "*"
+spl-associated-token-account-interface = "*"
+vortex-core = { path = "../crates/vortex-core" }
+vortex-token-weighted = { path = "../programs/token-weighted", features = ["no-entrypoint"] }

@@ -1,0 +1,12 @@
+[package]
+name = "vortex-core"
+description = "Shared rules for the Vortexes governance programs: config checks, proposal state, tallies, stored-instruction execution."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[features]
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = { workspace = true }

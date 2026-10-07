@@ -1,0 +1,4 @@
+# Host toolchain for tests (LiteSVM needs >= 1.97.1). cargo-build-sbf uses
+# Solana's own toolchain for the on-chain programs regardless.
+[toolchain]
+channel = "1.97.1"
