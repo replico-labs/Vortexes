@@ -1,0 +1,30 @@
+[package]
+name = "vortex-delegate"
+description = "Vortexes delegate governance: members elect a council for a term; the council proposes and votes; members can recall a council member."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "vortex_delegate"
+
+[features]
+default = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+custom-heap = []
+custom-panic = []
+anchor-debug = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "vortex-core/idl-build", "vortex-hub/idl-build"]
+
+[dependencies]
+anchor-lang = { workspace = true, features = ["init-if-needed"] }
+anchor-spl = { workspace = true }
+vortex-core = { path = "../../crates/vortex-core" }
+vortex-hub = { path = "../hub", features = ["cpi"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

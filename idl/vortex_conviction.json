@@ -1,0 +1,2063 @@
+{
+  "address": "5pDzksjjD4oQskX4RcHZ8qeKwyoRyC67SdHSMsVGGqaA",
+  "metadata": {
+    "name": "vortex_conviction",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Vortexes conviction governance: members back one proposal at a time with their deposit; support builds conviction over time, and a proposal runs once its conviction crosses the bar."
+  },
+  "instructions": [
+    {
+      "name": "add_asset",
+      "docs": [
+        "Lists a token (only through a passed proposal). Applies at once."
+      ],
+      "discriminator": [
+        81,
+        53,
+        134,
+        142,
+        243,
+        73,
+        42,
+        179
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        }
+      ],
+      "args": [
+        {
+          "name": "weight",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "apply_asset_change",
+      "docs": [
+        "Applies a scheduled weight cut or removal once it's due. Anyone."
+      ],
+      "discriminator": [
+        70,
+        32,
+        177,
+        81,
+        175,
+        184,
+        98,
+        75
+      ],
+      "accounts": [
+        {
+          "name": "governance",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "cancel",
+      "docs": [
+        "Cancels a proposal that hasn't executed: its proposer, or the DAO",
+        "through a proposal. Supporters then withdraw their support."
+      ],
+      "discriminator": [
+        232,
+        219,
+        223,
+        41,
+        219,
+        236,
+        220,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "check_budget",
+      "docs": [
+        "Budget step 2, the proposal's last instruction: fails the whole",
+        "execution if a watched balance dropped by more than its budget, or a",
+        "watched account was closed or given a new owner, delegate or close",
+        "authority."
+      ],
+      "discriminator": [
+        43,
+        41,
+        6,
+        204,
+        184,
+        116,
+        116,
+        219
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "confirm_execution",
+      "docs": [
+        "The hub's check before it runs a proposal (vortex-core's",
+        "CONFIRM_EXECUTION); only the hub's executor PDA for this DAO."
+      ],
+      "discriminator": [
+        34,
+        75,
+        247,
+        73,
+        89,
+        127,
+        101,
+        123
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "deposit",
+      "docs": [
+        "Deposits the DAO's token. To back a proposal with it, `support`",
+        "(again, if already supporting one)."
+      ],
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        },
+        {
+          "name": "voter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "relations": [
+            "governance"
+          ]
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "governance"
+          ]
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "init_governance",
+      "docs": [
+        "Sets up a hub DAO in this program: rules, token, vault, and the asset",
+        "list (SOL and the DAO's token, with these weights). The creator right",
+        "after `vortex_hub::create_dao`, or the DAO's treasury (inside a",
+        "passed proposal) when switching to this model."
+      ],
+      "discriminator": [
+        23,
+        241,
+        166,
+        67,
+        20,
+        30,
+        182,
+        32
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "hub_dao"
+        },
+        {
+          "name": "governance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  118,
+                  101,
+                  114,
+                  110,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": {
+              "name": "ConvictionConfig"
+            }
+          }
+        },
+        {
+          "name": "sol_weight",
+          "type": "u64"
+        },
+        {
+          "name": "token_weight",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "propose",
+      "docs": [
+        "Proposes instructions for the treasury to run (at most",
+        "MAX_INSTRUCTIONS - BUDGET_STEPS) with a spending budget, and fixes",
+        "the conviction they need. `id` must be proposal_count + 1. Remaining",
+        "accounts: each listed asset's account, in list order (the treasury",
+        "for SOL), to read today's holdings."
+      ],
+      "discriminator": [
+        93,
+        253,
+        82,
+        168,
+        118,
+        33,
+        102,
+        90
+      ],
+      "accounts": [
+        {
+          "name": "proposer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        },
+        {
+          "name": "hub_dao",
+          "relations": [
+            "governance"
+          ]
+        },
+        {
+          "name": "voter",
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "proposer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "id",
+          "type": "u64"
+        },
+        {
+          "name": "metadata_uri",
+          "type": "string"
+        },
+        {
+          "name": "instructions",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "StoredInstruction"
+              }
+            }
+          }
+        },
+        {
+          "name": "budget",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "AssetAmount"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "queue",
+      "docs": [
+        "Queues a proposal whose conviction has reached its bar. Anyone."
+      ],
+      "discriminator": [
+        112,
+        64,
+        181,
+        10,
+        211,
+        85,
+        67,
+        206
+      ],
+      "accounts": [
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "record_balances",
+      "docs": [
+        "Budget step 1, added to every proposal: records the watched balances.",
+        "Runs only inside the hub's execution of this proposal (the treasury",
+        "signs), right after `confirm_execution`. Remaining accounts: the",
+        "watched token accounts, in order."
+      ],
+      "discriminator": [
+        17,
+        190,
+        219,
+        171,
+        18,
+        237,
+        109,
+        51
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "remove_asset",
+      "docs": [
+        "Schedules taking a token off the list (only through a passed",
+        "proposal); it applies after WEIGHT_CUT_DELAY. SOL stays listed."
+      ],
+      "discriminator": [
+        139,
+        243,
+        2,
+        142,
+        50,
+        197,
+        54,
+        181
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_asset_weight",
+      "docs": [
+        "Changes an asset's weight (only through a passed proposal). A raise",
+        "applies at once; a cut waits WEIGHT_CUT_DELAY."
+      ],
+      "discriminator": [
+        40,
+        170,
+        126,
+        147,
+        177,
+        112,
+        82,
+        0
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "weight",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "support",
+      "docs": [
+        "Backs `proposal` with the member's whole deposit, locking it. If they",
+        "were backing another proposal, pass it as `previous`: their support",
+        "moves from there to here. Supporting the same proposal again tops",
+        "it up with tokens deposited since."
+      ],
+      "discriminator": [
+        248,
+        84,
+        100,
+        40,
+        143,
+        13,
+        179,
+        112
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal",
+            "previous"
+          ]
+        },
+        {
+          "name": "voter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        },
+        {
+          "name": "previous",
+          "docs": [
+            "The proposal the member backs now, if any."
+          ],
+          "writable": true,
+          "optional": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_config",
+      "docs": [
+        "Replaces the rules (only through a passed proposal). Bars already",
+        "set on existing proposals don't change."
+      ],
+      "discriminator": [
+        29,
+        158,
+        252,
+        191,
+        10,
+        83,
+        219,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": {
+              "name": "ConvictionConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "docs": [
+        "Withdraws deposited tokens that aren't backing a proposal."
+      ],
+      "discriminator": [
+        183,
+        18,
+        70,
+        156,
+        148,
+        109,
+        161,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        },
+        {
+          "name": "voter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "relations": [
+            "governance"
+          ]
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "governance"
+          ]
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw_support",
+      "docs": [
+        "Stops backing the member's current proposal, unlocking their deposit."
+      ],
+      "discriminator": [
+        79,
+        255,
+        106,
+        67,
+        232,
+        160,
+        28,
+        196
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "voter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Governance",
+      "discriminator": [
+        18,
+        143,
+        88,
+        13,
+        73,
+        217,
+        47,
+        49
+      ]
+    },
+    {
+      "name": "Proposal",
+      "discriminator": [
+        26,
+        94,
+        189,
+        187,
+        116,
+        136,
+        53,
+        33
+      ]
+    },
+    {
+      "name": "Voter",
+      "discriminator": [
+        241,
+        93,
+        35,
+        191,
+        254,
+        147,
+        17,
+        202
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "AssetChangeScheduled",
+      "discriminator": [
+        27,
+        22,
+        68,
+        39,
+        26,
+        138,
+        251,
+        39
+      ]
+    },
+    {
+      "name": "AssetListed",
+      "discriminator": [
+        39,
+        64,
+        97,
+        162,
+        189,
+        150,
+        150,
+        2
+      ]
+    },
+    {
+      "name": "AssetRemoved",
+      "discriminator": [
+        100,
+        213,
+        14,
+        53,
+        106,
+        252,
+        170,
+        140
+      ]
+    },
+    {
+      "name": "AssetWeightChanged",
+      "discriminator": [
+        146,
+        160,
+        106,
+        196,
+        46,
+        100,
+        127,
+        196
+      ]
+    },
+    {
+      "name": "ConfigUpdated",
+      "discriminator": [
+        40,
+        241,
+        230,
+        122,
+        11,
+        19,
+        198,
+        194
+      ]
+    },
+    {
+      "name": "Deposited",
+      "discriminator": [
+        111,
+        141,
+        26,
+        45,
+        161,
+        35,
+        100,
+        57
+      ]
+    },
+    {
+      "name": "GovernanceInitialized",
+      "discriminator": [
+        41,
+        187,
+        103,
+        26,
+        42,
+        44,
+        30,
+        15
+      ]
+    },
+    {
+      "name": "ProposalCancelled",
+      "discriminator": [
+        253,
+        59,
+        104,
+        46,
+        129,
+        78,
+        9,
+        14
+      ]
+    },
+    {
+      "name": "ProposalCreated",
+      "discriminator": [
+        186,
+        8,
+        160,
+        108,
+        81,
+        13,
+        51,
+        206
+      ]
+    },
+    {
+      "name": "ProposalExecuted",
+      "discriminator": [
+        92,
+        213,
+        189,
+        201,
+        101,
+        83,
+        111,
+        83
+      ]
+    },
+    {
+      "name": "ProposalQueued",
+      "discriminator": [
+        127,
+        31,
+        107,
+        17,
+        2,
+        119,
+        72,
+        39
+      ]
+    },
+    {
+      "name": "SupportWithdrawn",
+      "discriminator": [
+        8,
+        157,
+        86,
+        193,
+        116,
+        72,
+        245,
+        155
+      ]
+    },
+    {
+      "name": "Supported",
+      "discriminator": [
+        242,
+        172,
+        186,
+        165,
+        181,
+        92,
+        115,
+        252
+      ]
+    },
+    {
+      "name": "Withdrawn",
+      "discriminator": [
+        20,
+        89,
+        223,
+        198,
+        194,
+        124,
+        219,
+        13
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "AssetAmount",
+      "docs": [
+        "One line of a proposal's budget."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "docs": [
+              "A listed mint, or SOL."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Most the treasury may lose of it (raw units; lamports for SOL)."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AssetChangeScheduled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "weight",
+            "type": "u64"
+          },
+          {
+            "name": "remove",
+            "type": "bool"
+          },
+          {
+            "name": "effective_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AssetListed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "weight",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AssetRemoved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AssetState",
+      "docs": [
+        "A watched account's state."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "exists",
+            "type": "bool"
+          },
+          {
+            "name": "balance",
+            "type": "u64"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "delegate",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "close_authority",
+            "type": {
+              "option": "pubkey"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AssetWeightChanged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "from",
+            "type": "u64"
+          },
+          {
+            "name": "to",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "ConvictionConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConvictionConfig",
+      "docs": [
+        "A DAO's rules. Times in seconds; amounts in raw tokens."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "growth_rate",
+            "docs": [
+              "How far conviction can move per second, toward current support."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "min_conviction",
+            "docs": [
+              "The lowest bar any proposal faces."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "support_bps",
+            "docs": [
+              "Share of all deposits (when proposed) a proposal's bar is set to,",
+              "if that's above `min_conviction`."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "proposal_threshold",
+            "docs": [
+              "Deposit needed to propose."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "timelock",
+            "type": "u32"
+          },
+          {
+            "name": "execution_period",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Dao",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "create_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "governance_program",
+            "docs": [
+              "The governance program running the DAO now."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "governance",
+            "docs": [
+              "The DAO's account in that program: `[GOVERNANCE_SEED, dao]` there."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "Starts at 1 and goes up with every switch. Proposals only run in",
+              "the epoch they were made in."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "pending_switch",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PendingSwitch"
+                }
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "treasury_bump",
+            "type": "u8"
+          },
+          {
+            "name": "executor_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Deposited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Governance",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "executor",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "ConvictionConfig"
+              }
+            }
+          },
+          {
+            "name": "proposal_count",
+            "type": "u64"
+          },
+          {
+            "name": "total_deposited",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "assets",
+            "docs": [
+              "Assets budgets protect; SOL first."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "ListedAsset"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "GovernanceInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListedAsset",
+      "docs": [
+        "An asset on the list."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "docs": [
+              "The token's mint, or SOL."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "docs": [
+              "Token or Token-2022 (default for SOL)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "account",
+            "docs": [
+              "Where the treasury holds it: its associated token account (the",
+              "treasury itself for SOL)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "weight",
+            "docs": [
+              "Conviction added for spending all of the holding."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "pending",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PendingAssetChange"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PendingAssetChange",
+      "docs": [
+        "A weight cut or removal waiting out WEIGHT_CUT_DELAY."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "weight",
+            "type": "u64"
+          },
+          {
+            "name": "remove",
+            "type": "bool"
+          },
+          {
+            "name": "effective_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PendingSwitch",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program",
+            "type": "pubkey"
+          },
+          {
+            "name": "ready_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Proposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "core",
+            "docs": [
+              "Standard prefix the hub reads."
+            ],
+            "type": {
+              "defined": {
+                "name": "ProposalCore"
+              }
+            }
+          },
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "required_conviction",
+            "docs": [
+              "Fixed when proposed."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "conviction",
+            "docs": [
+              "As of `last_update`; see [`Proposal::conviction_at`] for now."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "total_support",
+            "docs": [
+              "Deposits backing it now."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "last_update",
+            "type": "i64"
+          },
+          {
+            "name": "queued_at",
+            "type": "i64"
+          },
+          {
+            "name": "executed",
+            "type": "bool"
+          },
+          {
+            "name": "cancelled",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "budget",
+            "docs": [
+              "Most it may spend of each listed asset; anything else listed: 0."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "AssetAmount"
+                }
+              }
+            }
+          },
+          {
+            "name": "weakens_rules",
+            "docs": [
+              "Whether it faced the bar of spending everything."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "watched",
+            "docs": [
+              "The assets listed when it was made, and their state when it ran."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Watched"
+                }
+              }
+            }
+          },
+          {
+            "name": "budget_stage",
+            "docs": [
+              "0 before running, 1 once balances are recorded, 2 once checked."
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalCore",
+      "docs": [
+        "The first field of every governance program's proposal account, right",
+        "after Anchor's 8-byte discriminator, so the hub can read what to run",
+        "from any model."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "docs": [
+              "The hub DAO this proposal belongs to."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "The hub epoch it was made in; only runs while that epoch lasts."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "instructions",
+            "docs": [
+              "What it does when it executes, signed by the treasury."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "StoredInstruction"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          },
+          {
+            "name": "budget",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "AssetAmount"
+                }
+              }
+            }
+          },
+          {
+            "name": "weakens_rules",
+            "type": "bool"
+          },
+          {
+            "name": "required_conviction",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalQueued",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "executable_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StoredAccountMeta",
+      "docs": [
+        "One account an instruction touches."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_signer",
+            "type": "bool"
+          },
+          {
+            "name": "is_writable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StoredInstruction",
+      "docs": [
+        "One instruction a proposal runs when it executes."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "StoredAccountMeta"
+                }
+              }
+            }
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SupportWithdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "supporter",
+            "type": "pubkey"
+          },
+          {
+            "name": "weight",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Supported",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "supporter",
+            "type": "pubkey"
+          },
+          {
+            "name": "weight",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Voter",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "supporting",
+            "docs": [
+              "The proposal this member backs (default = none)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "support_weight",
+            "docs": [
+              "How much of `amount` backs it (locked)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Watched",
+      "docs": [
+        "An asset a proposal watches, and its state before the proposal ran."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "account",
+            "type": "pubkey"
+          },
+          {
+            "name": "before",
+            "type": {
+              "defined": {
+                "name": "AssetState"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Withdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

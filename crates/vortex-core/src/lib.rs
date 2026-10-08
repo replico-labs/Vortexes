@@ -180,6 +180,64 @@ pub enum GovError {
     BondAlreadyResolved,
     #[msg("Challenge period must be longer than zero")]
     InvalidChallengePeriod,
+    #[msg("Invalid governance rules")]
+    InvalidConfig,
+    #[msg("You aren't supporting that proposal")]
+    NotSupporting,
+    #[msg("Already supporting this proposal")]
+    AlreadySupporting,
+    #[msg("Not enough conviction yet")]
+    ConvictionNotReached,
+    #[msg("Only council members can do this")]
+    NotCouncilMember,
+    #[msg("The council's term hasn't ended")]
+    TermNotOver,
+    #[msg("An election is already running")]
+    ElectionInProgress,
+    #[msg("The candidacy window has closed")]
+    CandidacyClosed,
+    #[msg("Already a candidate")]
+    AlreadyCandidate,
+    #[msg("This election has the most candidates it can take")]
+    TooManyCandidates,
+    #[msg("Not a candidate in this election")]
+    NotCandidate,
+    #[msg("The same candidate twice")]
+    DuplicateCandidate,
+    #[msg("Election voting isn't open")]
+    ElectionVotingNotOpen,
+    #[msg("Already finalized")]
+    AlreadyFinalized,
+    #[msg("Vote for between one candidate and the council size")]
+    InvalidBallot,
+    #[msg("Already voted")]
+    AlreadyVoted,
+    #[msg("A new council has been elected since this proposal was made")]
+    CouncilChanged,
+    #[msg("That asset isn't on the DAO's list")]
+    AssetNotListed,
+    #[msg("That asset is already on the list")]
+    AssetAlreadyListed,
+    #[msg("The asset list is full")]
+    TooManyAssets,
+    #[msg("The same asset twice in a budget")]
+    DuplicateBudgetAsset,
+    #[msg("The proposal spent more than its budget")]
+    BudgetExceeded,
+    #[msg("The proposal changed a watched treasury account's owner, delegate or close authority, or closed it")]
+    WatchedAccountChanged,
+    #[msg("Assets were added to the list since this proposal was made")]
+    AssetListChanged,
+    #[msg("No change is pending for that asset")]
+    NoPendingAssetChange,
+    #[msg("The asset change isn't due yet")]
+    AssetChangeNotDue,
+    #[msg("Proposals can't include that instruction")]
+    ReservedInstruction,
+    #[msg("Budget steps ran out of order")]
+    BudgetStepOutOfOrder,
+    #[msg("SOL can't be removed from the asset list")]
+    CantRemoveSol,
 }
 
 /// A DAO's voting rules. Times are in seconds.

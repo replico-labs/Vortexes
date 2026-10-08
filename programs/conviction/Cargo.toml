@@ -1,0 +1,30 @@
+[package]
+name = "vortex-conviction"
+description = "Vortexes conviction governance: members back one proposal at a time with their deposit; support builds conviction over time, and a proposal runs once its conviction crosses the bar."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "vortex_conviction"
+
+[features]
+default = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+custom-heap = []
+custom-panic = []
+anchor-debug = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "vortex-core/idl-build", "vortex-hub/idl-build"]
+
+[dependencies]
+anchor-lang = { workspace = true, features = ["init-if-needed"] }
+anchor-spl = { workspace = true }
+vortex-core = { path = "../../crates/vortex-core" }
+vortex-hub = { path = "../hub", features = ["cpi"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

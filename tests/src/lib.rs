@@ -30,6 +30,8 @@ pub const TW: Pubkey = tw::ID;
 pub const QV: Pubkey = vortex_quadratic::ID;
 pub const OPT: Pubkey = vortex_optimistic::ID;
 pub const BOARD: Pubkey = vortex_board::ID;
+pub const CONV: Pubkey = vortex_conviction::ID;
+pub const DEL: Pubkey = vortex_delegate::ID;
 pub const SYSTEM: Pubkey = anchor_lang::system_program::ID;
 
 pub fn config() -> VotingConfig {
@@ -73,7 +75,7 @@ impl Env {
         env
     }
 
-    /// The hub with all four models approved, a token mint, and no DAO yet.
+    /// The hub with all six models approved, a token mint, and no DAO yet.
     pub fn bare(token_program: Pubkey) -> Self {
         let mut svm = LiteSVM::new();
         for (id, name) in [
@@ -82,6 +84,8 @@ impl Env {
             (QV, "vortex_quadratic"),
             (OPT, "vortex_optimistic"),
             (BOARD, "vortex_board"),
+            (CONV, "vortex_conviction"),
+            (DEL, "vortex_delegate"),
         ] {
             if let Err(e) = svm.add_program_from_file(id, format!("{DIR}{name}.so")) {
                 panic!(
@@ -113,6 +117,8 @@ impl Env {
                 env.ix_set_model(QV, "quadratic", true),
                 env.ix_set_model(OPT, "optimistic", true),
                 env.ix_set_model(BOARD, "board", true),
+                env.ix_set_model(CONV, "conviction", true),
+                env.ix_set_model(DEL, "delegate", true),
             ],
             &[&admin_kp],
         )
@@ -426,6 +432,10 @@ impl Env {
             vortex_optimistic::Governance::try_deserialize(&mut data.as_slice()).unwrap().proposal_count
         } else if gp == BOARD {
             vortex_board::Governance::try_deserialize(&mut data.as_slice()).unwrap().proposal_count
+        } else if gp == CONV {
+            vortex_conviction::Governance::try_deserialize(&mut data.as_slice()).unwrap().proposal_count
+        } else if gp == DEL {
+            vortex_delegate::Governance::try_deserialize(&mut data.as_slice()).unwrap().proposal_count
         } else {
             Governance::try_deserialize(&mut data.as_slice()).unwrap().proposal_count
         }
@@ -536,13 +546,18 @@ pub fn dao_with_members() -> (Env, Member, Member) {
 
 
 /// The creator's first-setup instruction for `gp` with default rules
-/// (board: the creator as its only signer).
+/// (board: the creator as its only signer; delegate: the creator as the
+/// whole council).
 pub fn env_init(gp: Pubkey) -> impl FnOnce(&Env, &Pubkey) -> Instruction {
     move |env: &Env, creator: &Pubkey| {
         if gp == OPT {
             env.ix_init_optimistic(creator, creator, opt_config())
         } else if gp == BOARD {
             env.ix_init_board(creator, creator, vec![*creator], board_config(1))
+        } else if gp == CONV {
+            env.ix_init_conviction(creator, creator, conv_config())
+        } else if gp == DEL {
+            env.ix_init_delegate(creator, creator, vec![*creator], DelegateConfig { council_size: 1, council_quorum: 1, ..del_config() })
         } else {
             env.ix_init_governance(gp, creator, creator, config())
         }
@@ -767,6 +782,363 @@ impl Env {
             program_id: BOARD,
             accounts: board::accounts::TreasuryOnly { treasury: self.treasury, governance: self.governance(BOARD) }.to_account_metas(None),
             data,
+        })
+    }
+}
+
+// ---------------------------------------------------------------
+// Conviction
+// ---------------------------------------------------------------
+
+pub use vortex_conviction::{self as conv, AssetAmount, ConvictionConfig, ConvictionState, SOL};
+
+/// Conviction moves 10 per second; the bar is 20% of deposits, at least 100.
+pub fn conv_config() -> ConvictionConfig {
+    ConvictionConfig { growth_rate: 10, min_conviction: 100, support_bps: 2_000, proposal_threshold: 100, timelock: 50, execution_period: 200 }
+}
+
+impl Env {
+    /// Conviction setup with SOL and the DAO's token listed at weight 0
+    /// (budgets enforced, no extra bar).
+    pub fn ix_init_conviction(&self, authority: &Pubkey, payer: &Pubkey, config: ConvictionConfig) -> Instruction {
+        self.ix_init_conviction_weighted(authority, payer, config, 0, 0)
+    }
+
+    pub fn ix_init_conviction_weighted(&self, authority: &Pubkey, payer: &Pubkey, config: ConvictionConfig, sol_weight: u64, token_weight: u64) -> Instruction {
+        Instruction {
+            program_id: CONV,
+            accounts: conv::accounts::InitGovernance {
+                authority: *authority,
+                payer: *payer,
+                hub_dao: self.dao,
+                governance: self.governance(CONV),
+                mint: self.mint,
+                vault: self.vault(CONV),
+                token_program: self.token_program,
+                system_program: SYSTEM,
+            }
+            .to_account_metas(None),
+            data: conv::instruction::InitGovernance { config, sol_weight, token_weight }.data(),
+        }
+    }
+
+    pub fn conv_governance(&self) -> conv::Governance {
+        conv::Governance::try_deserialize(&mut self.svm.get_account(&self.governance(CONV)).unwrap().data.as_slice()).unwrap()
+    }
+
+    pub fn conv_proposal(&self, p: Pubkey) -> conv::Proposal {
+        conv::Proposal::try_deserialize(&mut self.svm.get_account(&p).unwrap().data.as_slice()).unwrap()
+    }
+
+    pub fn conv_voter(&self, owner: &Pubkey) -> conv::Voter {
+        conv::Voter::try_deserialize(&mut self.svm.get_account(&self.voter_pda(CONV, owner)).unwrap().data.as_slice()).unwrap()
+    }
+
+    pub fn conv_state(&self, p: Pubkey) -> ConvictionState {
+        self.conv_proposal(p).state(&self.conv_governance().config, self.now())
+    }
+
+    /// `p`'s conviction right now.
+    pub fn conviction(&self, p: Pubkey) -> u64 {
+        self.conv_proposal(p).conviction_at(self.conv_governance().config.growth_rate, self.now())
+    }
+
+    /// Proposes with a budget, passing the listed assets' accounts.
+    pub fn conv_propose(&mut self, m: &Member, instructions: Vec<StoredInstruction>, budget: Vec<AssetAmount>) -> Result<(u64, Pubkey), FailedTransactionMetadata> {
+        let id = self.proposal_count(CONV) + 1;
+        let proposal = self.proposal_pda(CONV, id);
+        let voter = self.voter_pda(CONV, &m.kp.pubkey());
+        let has_voter = self.svm.get_account(&voter).is_some_and(|a| a.lamports > 0);
+        let mut accounts = conv::accounts::Propose {
+            proposer: m.kp.pubkey(),
+            governance: self.governance(CONV),
+            hub_dao: self.dao,
+            voter: has_voter.then_some(voter),
+            proposal,
+            system_program: SYSTEM,
+        }
+        .to_account_metas(None);
+        for a in &self.conv_governance().assets {
+            accounts.push(AccountMeta::new_readonly(a.account, false));
+        }
+        let ix = Instruction {
+            program_id: CONV,
+            accounts,
+            data: conv::instruction::Propose { id, metadata_uri: "Fund the community garden".into(), instructions, budget }.data(),
+        };
+        self.send(&[ix], &[&m.kp]).map(|_| (id, proposal))
+    }
+
+    /// Lamports of SOL, as a budget line.
+    pub fn sol_budget(lamports: u64) -> AssetAmount {
+        AssetAmount { mint: SOL, amount: lamports }
+    }
+
+    /// A stored instruction for conviction's treasury-only calls.
+    pub fn conv_admin_ix(&self, data: Vec<u8>) -> StoredInstruction {
+        stored(Instruction {
+            program_id: CONV,
+            accounts: conv::accounts::TreasuryOnly { treasury: self.treasury, governance: self.governance(CONV) }.to_account_metas(None),
+            data,
+        })
+    }
+
+    pub fn conv_add_asset_ix(&self, mint: Pubkey, weight: u64) -> StoredInstruction {
+        stored(Instruction {
+            program_id: CONV,
+            accounts: conv::accounts::AddAsset { treasury: self.treasury, governance: self.governance(CONV), mint }.to_account_metas(None),
+            data: conv::instruction::AddAsset { weight }.data(),
+        })
+    }
+
+    pub fn apply_asset_change(&mut self, mint: Pubkey) -> Result<(), FailedTransactionMetadata> {
+        let ix = Instruction {
+            program_id: CONV,
+            accounts: conv::accounts::ApplyAssetChange { governance: self.governance(CONV) }.to_account_metas(None),
+            data: conv::instruction::ApplyAssetChange { mint }.data(),
+        };
+        let admin = self.admin.insecure_clone();
+        self.send(&[ix], &[&admin])
+    }
+
+    pub fn support(&mut self, m: &Member, p: Pubkey, previous: Option<Pubkey>) -> Result<(), FailedTransactionMetadata> {
+        let ix = Instruction {
+            program_id: CONV,
+            accounts: conv::accounts::Support {
+                owner: m.kp.pubkey(),
+                governance: self.governance(CONV),
+                voter: self.voter_pda(CONV, &m.kp.pubkey()),
+                proposal: p,
+                previous,
+            }
+            .to_account_metas(None),
+            data: conv::instruction::Support {}.data(),
+        };
+        self.send(&[ix], &[&m.kp])
+    }
+
+    pub fn withdraw_support(&mut self, m: &Member, p: Pubkey) -> Result<(), FailedTransactionMetadata> {
+        let ix = Instruction {
+            program_id: CONV,
+            accounts: conv::accounts::WithdrawSupport {
+                owner: m.kp.pubkey(),
+                governance: self.governance(CONV),
+                voter: self.voter_pda(CONV, &m.kp.pubkey()),
+                proposal: p,
+            }
+            .to_account_metas(None),
+            data: conv::instruction::WithdrawSupport {}.data(),
+        };
+        self.send(&[ix], &[&m.kp])
+    }
+
+    pub fn conv_update_config_ix(&self, config: ConvictionConfig) -> StoredInstruction {
+        self.conv_admin_ix(conv::instruction::UpdateConfig { config }.data())
+    }
+}
+
+// ---------------------------------------------------------------
+// Delegate
+// ---------------------------------------------------------------
+
+pub use vortex_delegate::{self as del, DelegateConfig};
+
+/// A 3-seat council, 2 votes and 60% to pass; 1000 s terms; elections:
+/// 50 s to declare (100 tokens), 100 s to vote; recalls: 10% quorum, 60%.
+pub fn del_config() -> DelegateConfig {
+    DelegateConfig {
+        council_size: 3,
+        term_length: 1_000,
+        candidacy_threshold: 100,
+        candidacy_period: 50,
+        election_voting_period: 100,
+        council_quorum: 2,
+        council_approval_bps: 6_000,
+        voting_delay: 10,
+        voting_period: 100,
+        timelock: 50,
+        execution_period: 200,
+        recall_quorum_bps: 1_000,
+        recall_approval_bps: 6_000,
+        recall_voting_period: 100,
+    }
+}
+
+impl Env {
+    pub fn ix_init_delegate(&self, authority: &Pubkey, payer: &Pubkey, council: Vec<Pubkey>, config: DelegateConfig) -> Instruction {
+        Instruction {
+            program_id: DEL,
+            accounts: del::accounts::InitGovernance {
+                authority: *authority,
+                payer: *payer,
+                hub_dao: self.dao,
+                governance: self.governance(DEL),
+                mint: self.mint,
+                vault: self.vault(DEL),
+                token_program: self.token_program,
+                system_program: SYSTEM,
+            }
+            .to_account_metas(None),
+            data: del::instruction::InitGovernance { council, config }.data(),
+        }
+    }
+
+    pub fn del_governance(&self) -> del::Governance {
+        del::Governance::try_deserialize(&mut self.svm.get_account(&self.governance(DEL)).unwrap().data.as_slice()).unwrap()
+    }
+
+    pub fn del_proposal(&self, p: Pubkey) -> del::Proposal {
+        del::Proposal::try_deserialize(&mut self.svm.get_account(&p).unwrap().data.as_slice()).unwrap()
+    }
+
+    pub fn del_state(&self, p: Pubkey) -> ProposalState {
+        self.del_proposal(p).state(&self.del_governance(), self.now())
+    }
+
+    pub fn election_pda(&self, id: u64) -> Pubkey {
+        Pubkey::find_program_address(&[del::ELECTION_SEED, self.governance(DEL).as_ref(), &id.to_le_bytes()], &DEL).0
+    }
+
+    pub fn recall_pda(&self, id: u64) -> Pubkey {
+        Pubkey::find_program_address(&[del::RECALL_SEED, self.governance(DEL).as_ref(), &id.to_le_bytes()], &DEL).0
+    }
+
+    pub fn election(&self, e: Pubkey) -> del::Election {
+        del::Election::try_deserialize(&mut self.svm.get_account(&e).unwrap().data.as_slice()).unwrap()
+    }
+
+    pub fn recall(&self, r: Pubkey) -> del::Recall {
+        del::Recall::try_deserialize(&mut self.svm.get_account(&r).unwrap().data.as_slice()).unwrap()
+    }
+
+    pub fn del_propose(&mut self, member: &Keypair, instructions: Vec<StoredInstruction>) -> Result<Pubkey, FailedTransactionMetadata> {
+        let id = self.proposal_count(DEL) + 1;
+        let proposal = self.proposal_pda(DEL, id);
+        let ix = Instruction {
+            program_id: DEL,
+            accounts: del::accounts::Propose { proposer: member.pubkey(), governance: self.governance(DEL), hub_dao: self.dao, proposal, system_program: SYSTEM }
+                .to_account_metas(None),
+            data: del::instruction::Propose { id, metadata_uri: "Fund the grants round".into(), instructions }.data(),
+        };
+        self.send(&[ix], &[member]).map(|_| proposal)
+    }
+
+    pub fn council_vote(&mut self, member: &Keypair, p: Pubkey, choice: del::VoteChoice) -> Result<(), FailedTransactionMetadata> {
+        let ix = Instruction {
+            program_id: DEL,
+            accounts: del::accounts::CouncilAction { member: member.pubkey(), governance: self.governance(DEL), proposal: p }.to_account_metas(None),
+            data: del::instruction::CastVote { choice }.data(),
+        };
+        self.send(&[ix], &[member])
+    }
+
+    pub fn start_election(&mut self) -> Result<Pubkey, FailedTransactionMetadata> {
+        let id = self.del_governance().election_count + 1;
+        let election = self.election_pda(id);
+        let ix = Instruction {
+            program_id: DEL,
+            accounts: del::accounts::StartElection { payer: self.admin.pubkey(), governance: self.governance(DEL), election, system_program: SYSTEM }
+                .to_account_metas(None),
+            data: del::instruction::StartElection { id }.data(),
+        };
+        let admin = self.admin.insecure_clone();
+        self.send(&[ix], &[&admin]).map(|_| election)
+    }
+
+    pub fn declare(&mut self, m: &Member, e: Pubkey) -> Result<(), FailedTransactionMetadata> {
+        let ix = Instruction {
+            program_id: DEL,
+            accounts: del::accounts::DeclareCandidacy {
+                candidate: m.kp.pubkey(),
+                governance: self.governance(DEL),
+                election: e,
+                voter: self.voter_pda(DEL, &m.kp.pubkey()),
+            }
+            .to_account_metas(None),
+            data: del::instruction::DeclareCandidacy {}.data(),
+        };
+        self.send(&[ix], &[&m.kp])
+    }
+
+    pub fn elect(&mut self, m: &Member, e: Pubkey, candidates: Vec<Pubkey>) -> Result<(), FailedTransactionMetadata> {
+        let ballot = Pubkey::find_program_address(&[del::BALLOT_SEED, e.as_ref(), m.kp.pubkey().as_ref()], &DEL).0;
+        let ix = Instruction {
+            program_id: DEL,
+            accounts: del::accounts::VoteInElection {
+                owner: m.kp.pubkey(),
+                governance: self.governance(DEL),
+                election: e,
+                voter: self.voter_pda(DEL, &m.kp.pubkey()),
+                ballot,
+                system_program: SYSTEM,
+            }
+            .to_account_metas(None),
+            data: del::instruction::VoteInElection { candidates }.data(),
+        };
+        self.send(&[ix], &[&m.kp])
+    }
+
+    pub fn finalize_election(&mut self, e: Pubkey) -> Result<(), FailedTransactionMetadata> {
+        let ix = Instruction {
+            program_id: DEL,
+            accounts: del::accounts::FinalizeElection { governance: self.governance(DEL), election: e }.to_account_metas(None),
+            data: del::instruction::FinalizeElection {}.data(),
+        };
+        let admin = self.admin.insecure_clone();
+        self.send(&[ix], &[&admin])
+    }
+
+    pub fn initiate_recall(&mut self, m: &Member, member: Pubkey) -> Result<Pubkey, FailedTransactionMetadata> {
+        let id = self.del_governance().recall_count + 1;
+        let recall = self.recall_pda(id);
+        let ix = Instruction {
+            program_id: DEL,
+            accounts: del::accounts::InitiateRecall {
+                initiator: m.kp.pubkey(),
+                governance: self.governance(DEL),
+                voter: self.voter_pda(DEL, &m.kp.pubkey()),
+                recall,
+                system_program: SYSTEM,
+            }
+            .to_account_metas(None),
+            data: del::instruction::InitiateRecall { id, member }.data(),
+        };
+        self.send(&[ix], &[&m.kp]).map(|_| recall)
+    }
+
+    pub fn vote_recall(&mut self, m: &Member, r: Pubkey, choice: del::VoteChoice) -> Result<(), FailedTransactionMetadata> {
+        let record = Pubkey::find_program_address(&[del::RECALL_VOTE_SEED, r.as_ref(), m.kp.pubkey().as_ref()], &DEL).0;
+        let ix = Instruction {
+            program_id: DEL,
+            accounts: del::accounts::VoteRecall {
+                owner: m.kp.pubkey(),
+                governance: self.governance(DEL),
+                recall: r,
+                voter: self.voter_pda(DEL, &m.kp.pubkey()),
+                recall_vote: record,
+                system_program: SYSTEM,
+            }
+            .to_account_metas(None),
+            data: del::instruction::VoteRecall { choice }.data(),
+        };
+        self.send(&[ix], &[&m.kp])
+    }
+
+    pub fn finalize_recall(&mut self, r: Pubkey) -> Result<(), FailedTransactionMetadata> {
+        let ix = Instruction {
+            program_id: DEL,
+            accounts: del::accounts::FinalizeRecall { governance: self.governance(DEL), recall: r }.to_account_metas(None),
+            data: del::instruction::FinalizeRecall {}.data(),
+        };
+        let admin = self.admin.insecure_clone();
+        self.send(&[ix], &[&admin])
+    }
+
+    pub fn del_update_config_ix(&self, config: DelegateConfig) -> StoredInstruction {
+        stored(Instruction {
+            program_id: DEL,
+            accounts: del::accounts::UpdateConfig { treasury: self.treasury, governance: self.governance(DEL) }.to_account_metas(None),
+            data: del::instruction::UpdateConfig { config }.data(),
         })
     }
 }

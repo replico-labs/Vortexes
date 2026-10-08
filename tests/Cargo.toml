@@ -26,3 +26,5 @@ vortex-token-weighted = { path = "../programs/token-weighted", features = ["no-e
 vortex-quadratic = { path = "../programs/quadratic", features = ["no-entrypoint"] }
 vortex-optimistic = { path = "../programs/optimistic", features = ["no-entrypoint"] }
 vortex-board = { path = "../programs/board", features = ["no-entrypoint"] }
+vortex-conviction = { path = "../programs/conviction", features = ["no-entrypoint"] }
+vortex-delegate = { path = "../programs/delegate", features = ["no-entrypoint"] }

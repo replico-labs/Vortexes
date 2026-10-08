@@ -1,0 +1,2486 @@
+{
+  "address": "2wq6f85JwVdwZ2S4d6pbZNLnS3rq1GYeD4LMNB79wzW7",
+  "metadata": {
+    "name": "vortex_delegate",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Vortexes delegate governance: members elect a council for a term; the council proposes and votes; members can recall a council member."
+  },
+  "instructions": [
+    {
+      "name": "cancel",
+      "docs": [
+        "Cancels a proposal that hasn't executed: its proposer, or the DAO",
+        "through a proposal."
+      ],
+      "discriminator": [
+        232,
+        219,
+        223,
+        41,
+        219,
+        236,
+        220,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cast_vote",
+      "docs": [
+        "A council member votes on a proposal while voting is open. One vote",
+        "per seat."
+      ],
+      "discriminator": [
+        20,
+        212,
+        15,
+        189,
+        69,
+        180,
+        69,
+        151
+      ],
+      "accounts": [
+        {
+          "name": "member",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "choice",
+          "type": {
+            "defined": {
+              "name": "VoteChoice"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "confirm_execution",
+      "docs": [
+        "The hub's check before it runs a proposal (vortex-core's",
+        "CONFIRM_EXECUTION); only the hub's executor PDA for this DAO."
+      ],
+      "discriminator": [
+        34,
+        75,
+        247,
+        73,
+        89,
+        127,
+        101,
+        123
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "declare_candidacy",
+      "docs": [
+        "Stands in an open election, during its candidacy window. Needs",
+        "`candidacy_threshold` deposited, which stays locked until voting ends."
+      ],
+      "discriminator": [
+        14,
+        213,
+        37,
+        96,
+        225,
+        169,
+        41,
+        87
+      ],
+      "accounts": [
+        {
+          "name": "candidate",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "election"
+          ]
+        },
+        {
+          "name": "election",
+          "writable": true
+        },
+        {
+          "name": "voter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "candidate"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "deposit",
+      "docs": [
+        "Deposits the DAO's token, adding election and recall weight."
+      ],
+      "discriminator": [
+        242,
+        35,
+        198,
+        137,
+        82,
+        225,
+        242,
+        182
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        },
+        {
+          "name": "voter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "relations": [
+            "governance"
+          ]
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "governance"
+          ]
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "finalize_election",
+      "docs": [
+        "Closes an election once voting ends and seats the winners. Anyone."
+      ],
+      "discriminator": [
+        175,
+        212,
+        115,
+        202,
+        87,
+        250,
+        48,
+        167
+      ],
+      "accounts": [
+        {
+          "name": "governance",
+          "writable": true,
+          "relations": [
+            "election"
+          ]
+        },
+        {
+          "name": "election",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalize_recall",
+      "docs": [
+        "Closes a recall once voting ends; if it passed and the member still",
+        "sits on the same council, they're removed. Anyone."
+      ],
+      "discriminator": [
+        61,
+        127,
+        31,
+        53,
+        51,
+        249,
+        38,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "governance",
+          "writable": true,
+          "relations": [
+            "recall"
+          ]
+        },
+        {
+          "name": "recall",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "init_governance",
+      "docs": [
+        "Sets up a hub DAO in this program: rules, token, vault and the first",
+        "council (exactly `council_size` members), whose term starts now. The",
+        "creator right after `vortex_hub::create_dao`, or the DAO's treasury",
+        "(inside a passed proposal) when switching to this model."
+      ],
+      "discriminator": [
+        23,
+        241,
+        166,
+        67,
+        20,
+        30,
+        182,
+        32
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "hub_dao"
+        },
+        {
+          "name": "governance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  118,
+                  101,
+                  114,
+                  110,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "council",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "config",
+          "type": {
+            "defined": {
+              "name": "DelegateConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "initiate_recall",
+      "docs": [
+        "Starts a token vote on removing `member` from the council. Needs",
+        "`candidacy_threshold` deposited. `id` must be recall_count + 1."
+      ],
+      "discriminator": [
+        5,
+        5,
+        111,
+        183,
+        245,
+        14,
+        77,
+        2
+      ],
+      "accounts": [
+        {
+          "name": "initiator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        },
+        {
+          "name": "voter",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "initiator"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recall",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  99,
+                  97,
+                  108,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "id",
+          "type": "u64"
+        },
+        {
+          "name": "member",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "propose",
+      "docs": [
+        "A council member proposes instructions for the treasury to run.",
+        "`id` must be proposal_count + 1."
+      ],
+      "discriminator": [
+        93,
+        253,
+        82,
+        168,
+        118,
+        33,
+        102,
+        90
+      ],
+      "accounts": [
+        {
+          "name": "proposer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        },
+        {
+          "name": "hub_dao",
+          "relations": [
+            "governance"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "id",
+          "type": "u64"
+        },
+        {
+          "name": "metadata_uri",
+          "type": "string"
+        },
+        {
+          "name": "instructions",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "StoredInstruction"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "queue",
+      "docs": [
+        "Queues a proposal that passed among current council members, once",
+        "voting has ended. Anyone."
+      ],
+      "discriminator": [
+        112,
+        64,
+        181,
+        10,
+        211,
+        85,
+        67,
+        206
+      ],
+      "accounts": [
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "start_election",
+      "docs": [
+        "Opens an election once the council's term is over. Anyone.",
+        "`id` must be election_count + 1."
+      ],
+      "discriminator": [
+        84,
+        120,
+        181,
+        159,
+        113,
+        70,
+        98,
+        143
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        },
+        {
+          "name": "election",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  108,
+                  101,
+                  99,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "update_config",
+      "docs": [
+        "Replaces the rules (only through a passed proposal). A new council",
+        "size applies from the next election."
+      ],
+      "discriminator": [
+        29,
+        158,
+        252,
+        191,
+        10,
+        83,
+        219,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": {
+              "name": "DelegateConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "vote_in_election",
+      "docs": [
+        "Votes for 1 to `council_size` different candidates; each gets the",
+        "member's whole deposit. Once per election; locks the deposit until",
+        "voting ends."
+      ],
+      "discriminator": [
+        244,
+        115,
+        249,
+        174,
+        77,
+        7,
+        26,
+        51
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "election"
+          ]
+        },
+        {
+          "name": "election",
+          "writable": true
+        },
+        {
+          "name": "voter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ballot",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  108,
+                  108,
+                  111,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "election"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "candidates",
+          "type": {
+            "vec": "pubkey"
+          }
+        }
+      ]
+    },
+    {
+      "name": "vote_recall",
+      "docs": [
+        "Votes on a recall, weighted by deposit. Once per recall; locks the",
+        "deposit until it ends."
+      ],
+      "discriminator": [
+        208,
+        89,
+        53,
+        8,
+        146,
+        27,
+        213,
+        136
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "recall"
+          ]
+        },
+        {
+          "name": "recall",
+          "writable": true
+        },
+        {
+          "name": "voter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "recall_vote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  99,
+                  97,
+                  108,
+                  108,
+                  95,
+                  118,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "recall"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "choice",
+          "type": {
+            "defined": {
+              "name": "VoteChoice"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "docs": [
+        "Withdraws a deposit once the elections and recalls the owner voted",
+        "or stood in have closed."
+      ],
+      "discriminator": [
+        183,
+        18,
+        70,
+        156,
+        148,
+        109,
+        161,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        },
+        {
+          "name": "voter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  111,
+                  116,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true,
+          "relations": [
+            "governance"
+          ]
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "governance"
+          ]
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Ballot",
+      "discriminator": [
+        3,
+        232,
+        121,
+        204,
+        232,
+        137,
+        138,
+        164
+      ]
+    },
+    {
+      "name": "Election",
+      "discriminator": [
+        68,
+        191,
+        164,
+        85,
+        35,
+        105,
+        152,
+        202
+      ]
+    },
+    {
+      "name": "Governance",
+      "discriminator": [
+        18,
+        143,
+        88,
+        13,
+        73,
+        217,
+        47,
+        49
+      ]
+    },
+    {
+      "name": "Proposal",
+      "discriminator": [
+        26,
+        94,
+        189,
+        187,
+        116,
+        136,
+        53,
+        33
+      ]
+    },
+    {
+      "name": "Recall",
+      "discriminator": [
+        148,
+        110,
+        21,
+        21,
+        183,
+        235,
+        125,
+        77
+      ]
+    },
+    {
+      "name": "RecallVote",
+      "discriminator": [
+        172,
+        87,
+        31,
+        138,
+        232,
+        229,
+        133,
+        6
+      ]
+    },
+    {
+      "name": "Voter",
+      "discriminator": [
+        241,
+        93,
+        35,
+        191,
+        254,
+        147,
+        17,
+        202
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "CandidacyDeclared",
+      "discriminator": [
+        40,
+        52,
+        183,
+        196,
+        88,
+        245,
+        68,
+        204
+      ]
+    },
+    {
+      "name": "ConfigUpdated",
+      "discriminator": [
+        40,
+        241,
+        230,
+        122,
+        11,
+        19,
+        198,
+        194
+      ]
+    },
+    {
+      "name": "Deposited",
+      "discriminator": [
+        111,
+        141,
+        26,
+        45,
+        161,
+        35,
+        100,
+        57
+      ]
+    },
+    {
+      "name": "ElectionFinalized",
+      "discriminator": [
+        157,
+        190,
+        148,
+        125,
+        38,
+        106,
+        119,
+        253
+      ]
+    },
+    {
+      "name": "ElectionStarted",
+      "discriminator": [
+        2,
+        68,
+        14,
+        231,
+        240,
+        250,
+        24,
+        125
+      ]
+    },
+    {
+      "name": "ElectionVoteCast",
+      "discriminator": [
+        214,
+        9,
+        172,
+        86,
+        88,
+        131,
+        144,
+        71
+      ]
+    },
+    {
+      "name": "GovernanceInitialized",
+      "discriminator": [
+        41,
+        187,
+        103,
+        26,
+        42,
+        44,
+        30,
+        15
+      ]
+    },
+    {
+      "name": "ProposalCancelled",
+      "discriminator": [
+        253,
+        59,
+        104,
+        46,
+        129,
+        78,
+        9,
+        14
+      ]
+    },
+    {
+      "name": "ProposalCreated",
+      "discriminator": [
+        186,
+        8,
+        160,
+        108,
+        81,
+        13,
+        51,
+        206
+      ]
+    },
+    {
+      "name": "ProposalExecuted",
+      "discriminator": [
+        92,
+        213,
+        189,
+        201,
+        101,
+        83,
+        111,
+        83
+      ]
+    },
+    {
+      "name": "ProposalQueued",
+      "discriminator": [
+        127,
+        31,
+        107,
+        17,
+        2,
+        119,
+        72,
+        39
+      ]
+    },
+    {
+      "name": "RecallFinalized",
+      "discriminator": [
+        187,
+        245,
+        218,
+        101,
+        208,
+        77,
+        80,
+        5
+      ]
+    },
+    {
+      "name": "RecallStarted",
+      "discriminator": [
+        202,
+        136,
+        105,
+        43,
+        11,
+        65,
+        55,
+        6
+      ]
+    },
+    {
+      "name": "RecallVoteCast",
+      "discriminator": [
+        19,
+        89,
+        99,
+        65,
+        213,
+        254,
+        7,
+        228
+      ]
+    },
+    {
+      "name": "VoteCast",
+      "discriminator": [
+        39,
+        53,
+        195,
+        104,
+        188,
+        17,
+        225,
+        213
+      ]
+    },
+    {
+      "name": "Withdrawn",
+      "discriminator": [
+        20,
+        89,
+        223,
+        198,
+        194,
+        124,
+        219,
+        13
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "Ballot",
+      "docs": [
+        "One per member per election, so nobody votes twice."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "election",
+            "type": "pubkey"
+          },
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "weight",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CandidacyDeclared",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "election",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "candidate",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Candidate",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "key",
+            "type": "pubkey"
+          },
+          {
+            "name": "votes",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "DelegateConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "CouncilVote",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "member",
+            "type": "pubkey"
+          },
+          {
+            "name": "choice",
+            "type": {
+              "defined": {
+                "name": "VoteChoice"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Dao",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "create_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "governance_program",
+            "docs": [
+              "The governance program running the DAO now."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "governance",
+            "docs": [
+              "The DAO's account in that program: `[GOVERNANCE_SEED, dao]` there."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "Starts at 1 and goes up with every switch. Proposals only run in",
+              "the epoch they were made in."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "pending_switch",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PendingSwitch"
+                }
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "treasury_bump",
+            "type": "u8"
+          },
+          {
+            "name": "executor_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DelegateConfig",
+      "docs": [
+        "A DAO's rules. Times in seconds; amounts in raw tokens."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "council_size",
+            "docs": [
+              "Seats on the council."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "term_length",
+            "docs": [
+              "How long a council serves before an election can start."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "candidacy_threshold",
+            "docs": [
+              "Deposit needed to stand for election or start a recall."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "candidacy_period",
+            "docs": [
+              "How long candidates can declare after an election starts."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "election_voting_period",
+            "docs": [
+              "How long election voting lasts, after candidacy closes."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "council_quorum",
+            "docs": [
+              "Council votes (for + against + abstain) a proposal needs."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "council_approval_bps",
+            "docs": [
+              "Share of for / (for + against) among council votes needed to pass."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "voting_delay",
+            "type": "u32"
+          },
+          {
+            "name": "voting_period",
+            "type": "u32"
+          },
+          {
+            "name": "timelock",
+            "type": "u32"
+          },
+          {
+            "name": "execution_period",
+            "type": "u32"
+          },
+          {
+            "name": "recall_quorum_bps",
+            "docs": [
+              "Share of all deposits (when the recall started) that must vote."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "recall_approval_bps",
+            "type": "u16"
+          },
+          {
+            "name": "recall_voting_period",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Deposited",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Election",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "candidacy_ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "voting_ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "candidates",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "Candidate"
+                }
+              }
+            }
+          },
+          {
+            "name": "finalized",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ElectionFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "election",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "council",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "term_ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "seated",
+            "docs": [
+              "False if nobody got a vote and the old council stayed."
+            ],
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ElectionStarted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "election",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "candidacy_ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "voting_ends_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ElectionVoteCast",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "election",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "candidates",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "weight",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Governance",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "executor",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "DelegateConfig"
+              }
+            }
+          },
+          {
+            "name": "council",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "council_term",
+            "docs": [
+              "Goes up each time an election seats a council."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "term_ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "election_count",
+            "type": "u64"
+          },
+          {
+            "name": "election_open",
+            "type": "bool"
+          },
+          {
+            "name": "proposal_count",
+            "type": "u64"
+          },
+          {
+            "name": "recall_count",
+            "type": "u64"
+          },
+          {
+            "name": "total_deposited",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GovernanceInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "council",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "term_ends_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PendingSwitch",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program",
+            "type": "pubkey"
+          },
+          {
+            "name": "ready_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Proposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "core",
+            "docs": [
+              "Standard prefix the hub reads."
+            ],
+            "type": {
+              "defined": {
+                "name": "ProposalCore"
+              }
+            }
+          },
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          },
+          {
+            "name": "council_term",
+            "docs": [
+              "The council that made it; it dies when a new one is elected."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "voting_starts_at",
+            "type": "i64"
+          },
+          {
+            "name": "voting_ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "votes",
+            "docs": [
+              "One per council member who voted (at most MAX_COUNCIL)."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "CouncilVote"
+                }
+              }
+            }
+          },
+          {
+            "name": "queued_at",
+            "type": "i64"
+          },
+          {
+            "name": "executed",
+            "type": "bool"
+          },
+          {
+            "name": "cancelled",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalCore",
+      "docs": [
+        "The first field of every governance program's proposal account, right",
+        "after Anchor's 8-byte discriminator, so the hub can read what to run",
+        "from any model."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "docs": [
+              "The hub DAO this proposal belongs to."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "The hub epoch it was made in; only runs while that epoch lasts."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "instructions",
+            "docs": [
+              "What it does when it executes, signed by the treasury."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "StoredInstruction"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          },
+          {
+            "name": "voting_starts_at",
+            "type": "i64"
+          },
+          {
+            "name": "voting_ends_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalQueued",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "executable_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Recall",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "member",
+            "type": "pubkey"
+          },
+          {
+            "name": "initiator",
+            "type": "pubkey"
+          },
+          {
+            "name": "council_term",
+            "docs": [
+              "Only removes the member from this council, not a later one."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "quorum_base",
+            "docs": [
+              "All deposits when it started: what quorum is measured against."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "tally",
+            "type": {
+              "defined": {
+                "name": "Tally"
+              }
+            }
+          },
+          {
+            "name": "finalized",
+            "type": "bool"
+          },
+          {
+            "name": "removed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RecallFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "recall",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "member",
+            "type": "pubkey"
+          },
+          {
+            "name": "removed",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RecallStarted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "recall",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "member",
+            "type": "pubkey"
+          },
+          {
+            "name": "initiator",
+            "type": "pubkey"
+          },
+          {
+            "name": "ends_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RecallVote",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "recall",
+            "type": "pubkey"
+          },
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "choice",
+            "type": {
+              "defined": {
+                "name": "VoteChoice"
+              }
+            }
+          },
+          {
+            "name": "weight",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RecallVoteCast",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "recall",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "voter",
+            "type": "pubkey"
+          },
+          {
+            "name": "choice",
+            "type": {
+              "defined": {
+                "name": "VoteChoice"
+              }
+            }
+          },
+          {
+            "name": "weight",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StoredAccountMeta",
+      "docs": [
+        "One account an instruction touches."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_signer",
+            "type": "bool"
+          },
+          {
+            "name": "is_writable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StoredInstruction",
+      "docs": [
+        "One instruction a proposal runs when it executes."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "StoredAccountMeta"
+                }
+              }
+            }
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Tally",
+      "docs": [
+        "Running vote totals, in voting weight."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "for_votes",
+            "type": "u64"
+          },
+          {
+            "name": "against_votes",
+            "type": "u64"
+          },
+          {
+            "name": "abstain_votes",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteCast",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "member",
+            "type": "pubkey"
+          },
+          {
+            "name": "choice",
+            "type": {
+              "defined": {
+                "name": "VoteChoice"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "VoteChoice",
+      "docs": [
+        "Same order as the EVM contracts' VoteType."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Against"
+          },
+          {
+            "name": "For"
+          },
+          {
+            "name": "Abstain"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Voter",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "locked_until",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Withdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}
