@@ -65,7 +65,12 @@ impl Env {
     fn with_token_program(token_program: Pubkey) -> Self {
         let mut svm = LiteSVM::new();
         for (id, name) in [(hub::ID, "vortex_hub"), (TW, "vortex_token_weighted"), (QV, "vortex_quadratic")] {
-            svm.add_program_from_file(id, format!("{DIR}{name}.so")).expect("build the programs first: anchor build");
+            if let Err(e) = svm.add_program_from_file(id, format!("{DIR}{name}.so")) {
+                panic!(
+                    "couldn't load {name}.so ({e:?}). Build with `anchor build`, not a bare `cargo-build-sbf` at the root: \
+                     building everything at once strips the hub's entry point."
+                );
+            }
         }
         let admin = Keypair::new();
         let creator = Keypair::new();
