@@ -33,7 +33,7 @@ use vortex_core::{
     GOVERNANCE_SEED, MAX_NAME_LEN, TREASURY_SEED,
 };
 
-declare_id!("F8LBtNiwU4b7XZ2X9oNEfSghSJ7B2ZgqvZC1DtqgUewr");
+declare_id!("5m9N12e9seKNxEXFBJSKr5vd9uryXpckSakfrzDWxMKe");
 
 pub const HUB_SEED: &[u8] = b"hub";
 pub const DAO_SEED: &[u8] = b"dao";

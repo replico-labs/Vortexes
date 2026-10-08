@@ -5,7 +5,7 @@
 //! vortex-quadratic; this file only sets the program's ID and how a deposit
 //! turns into votes. Money and execution live in vortex-hub.
 
-declare_id!("HGy7TqBWCxacyVoznw4UciYdcdwpmJ7JdCoZu8XTTHQ");
+declare_id!("Hf9MbqsbSDXGugmKYAVSLe3Urt3tTUPq5wNEsJgrikV8");
 
 /// Votes for a deposit of `deposit` raw tokens: one each.
 pub fn vote_weight(deposit: u64) -> u64 {

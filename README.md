@@ -86,15 +86,13 @@ anchor build      # programs into target/deploy/, IDLs into target/idl/
 cargo test        # unit tests + end-to-end tests (needs the build above)
 ```
 
-Use `anchor build`, not a bare `cargo-build-sbf` at the root: building everything in one go builds the hub without its entry point.
-
 The end-to-end tests run the compiled programs in [LiteSVM](https://github.com/LiteSVM/litesvm) with the real SPL Token, Token-2022 and Associated Token programs. Current result: **52 end-to-end tests and 10 unit tests passed, 0 failed**. They cover every model's lifecycle, the hub's checks, switching between models with one treasury, and budgets.
 
 `idl/` holds the IDLs for clients such as the bot; copy them from `target/idl/` after changing a program. Error codes come from `GovError` in `vortex-core` and are the same in every program.
 
 ## Deployment
 
-The program IDs are placeholders. Before the first deploy:
+The program IDs in the code are the devnet deployment's below. To deploy your own copy, generate your own program keypairs and point the code at them:
 
 ```bash
 anchor keys sync      # your own program keypairs' addresses into the code
@@ -102,7 +100,7 @@ anchor build
 anchor deploy --provider.cluster devnet
 ```
 
-Keep the program keypairs out of git (`.gitignore` already does). Deploying all seven programs costs about 17–18 SOL in rent.
+Keep the program keypairs out of git (`.gitignore` already does): whoever holds them controls those addresses. Deploying all seven programs costs about 17–18 SOL in rent.
 
 Then run the smoke test. It sets up the hub (your wallet becomes the hub admin) and approves the models, then creates a DAO in each model and pushes one proposal through that pays a little SOL from its treasury. It also starts a token-weighted → board switch, which can only finish after the hub's 2-day delay. A run costs about 0.6 SOL.
 
@@ -111,10 +109,26 @@ cargo run -p vortex-smoke -- run --url devnet             # uses ~/.config/solan
 cargo run -p vortex-smoke -- finish-switch --url devnet   # 2 days later
 ```
 
+### Devnet
+
+| Program | Address |
+|---|---|
+| `vortex-hub` | `5m9N12e9seKNxEXFBJSKr5vd9uryXpckSakfrzDWxMKe` |
+| `vortex-token-weighted` | `Hf9MbqsbSDXGugmKYAVSLe3Urt3tTUPq5wNEsJgrikV8` |
+| `vortex-quadratic` | `ES1UEWvh4uHf2nwE3pYSWms8QNEXDn2JtSiNjtAWi3tR` |
+| `vortex-optimistic` | `Bjcfj2p8da2mjzDzMbcpxSrqayuiDToDVZdaBPmGPpdX` |
+| `vortex-board` | `9yERBxsEw5oDDQVX2BEZP7ehpGAr3wArZoT3sbxNoXZE` |
+| `vortex-conviction` | `9sxWrySQv33tdf7WZQKW7zkDrjeq1EiphKqBgq2kxrWQ` |
+| `vortex-delegate` | `6TVZxo8LeXTsgH8iC39SD1AUeNUYJx3kGf71bEmsUvk2` |
+
+The hub is set up and all six models are approved. The smoke test passed on devnet for every model, and its token-weighted → board switch is waiting out the 2-day delay.
+
+### Mainnet — not yet deployed
+
 ## Known gaps
 
 - **No audit.** The hub holds every DAO's treasury. Get it audited before mainnet, and move the hub admin and every program's upgrade authority to a multisig.
-- **Not on devnet yet.** The smoke test passes on a local validator (every model, and starting a switch); devnet is next.
+- **Devnet only.** Every model has run a real proposal on devnet; switching has run in the tests but not yet finished on devnet.
 - **Not in the bot yet.** The bot runs Spaces on EVM chains only.
 - **Budgets only see listed assets,** and only in the treasury's associated token accounts.
 

@@ -22,7 +22,7 @@ use vortex_core::{
 };
 use vortex_hub::Dao as HubDao;
 
-declare_id!("5FLdbqX8Q6FsFZSPxiFK3ftaF4VBrHoz7MdDQ4E2jQzA");
+declare_id!("9yERBxsEw5oDDQVX2BEZP7ehpGAr3wArZoT3sbxNoXZE");
 
 pub const PROPOSAL_SEED: &[u8] = b"proposal";
 /// Most signers a board can have.

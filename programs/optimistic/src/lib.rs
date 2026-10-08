@@ -30,7 +30,7 @@ use vortex_core::{
 };
 use vortex_hub::Dao as HubDao;
 
-declare_id!("5GtCoYyrczVv1sZfXqi9qjqHEqoM4QaU9cg2nkzV3Z6c");
+declare_id!("Bjcfj2p8da2mjzDzMbcpxSrqayuiDToDVZdaBPmGPpdX");
 
 pub const VAULT_SEED: &[u8] = b"vault";
 pub const BOND_VAULT_SEED: &[u8] = b"bond_vault";

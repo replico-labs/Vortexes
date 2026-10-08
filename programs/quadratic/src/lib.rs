@@ -7,7 +7,7 @@
 //! Everything else is token-weighted's voting, shared through
 //! `token_voting.rs` so the two can't drift apart.
 
-declare_id!("5zF3LgrJgKwYGVtPJuxD5NTyznuoD2nhbHhBawG5gFH7");
+declare_id!("ES1UEWvh4uHf2nwE3pYSWms8QNEXDn2JtSiNjtAWi3tR");
 
 /// Votes for a deposit of `deposit` raw tokens: its integer square root.
 pub fn vote_weight(deposit: u64) -> u64 {

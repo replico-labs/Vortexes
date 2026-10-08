@@ -50,7 +50,7 @@ use vortex_core::{
 };
 use vortex_hub::Dao as HubDao;
 
-declare_id!("5pDzksjjD4oQskX4RcHZ8qeKwyoRyC67SdHSMsVGGqaA");
+declare_id!("9sxWrySQv33tdf7WZQKW7zkDrjeq1EiphKqBgq2kxrWQ");
 
 pub const VAULT_SEED: &[u8] = b"vault";
 pub const VOTER_SEED: &[u8] = b"voter";
