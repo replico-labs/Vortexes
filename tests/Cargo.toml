@@ -5,7 +5,7 @@ version.workspace = true
 edition.workspace = true
 publish = false
 
-[dev-dependencies]
+[dependencies]
 anchor-lang = { workspace = true }
 litesvm = "0.17.0"
 litesvm-token = "0.17.0"
@@ -24,3 +24,5 @@ vortex-core = { path = "../crates/vortex-core" }
 vortex-hub = { path = "../programs/hub", features = ["no-entrypoint"] }
 vortex-token-weighted = { path = "../programs/token-weighted", features = ["no-entrypoint"] }
 vortex-quadratic = { path = "../programs/quadratic", features = ["no-entrypoint"] }
+vortex-optimistic = { path = "../programs/optimistic", features = ["no-entrypoint"] }
+vortex-board = { path = "../programs/board", features = ["no-entrypoint"] }

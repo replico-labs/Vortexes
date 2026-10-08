@@ -7,18 +7,22 @@ resolution = true
 skip-lint = false
 
 [workspace]
-members = ["programs/hub", "programs/token-weighted", "programs/quadratic"]
+members = ["programs/hub", "programs/token-weighted", "programs/quadratic", "programs/optimistic", "programs/board"]
 
 # Placeholder IDs: run `anchor keys sync` before the first deploy.
 [programs.localnet]
 vortex_hub = "F8LBtNiwU4b7XZ2X9oNEfSghSJ7B2ZgqvZC1DtqgUewr"
 vortex_token_weighted = "HGy7TqBWCxacyVoznw4UciYdcdwpmJ7JdCoZu8XTTHQ"
 vortex_quadratic = "5zF3LgrJgKwYGVtPJuxD5NTyznuoD2nhbHhBawG5gFH7"
+vortex_optimistic = "5GtCoYyrczVv1sZfXqi9qjqHEqoM4QaU9cg2nkzV3Z6c"
+vortex_board = "5FLdbqX8Q6FsFZSPxiFK3ftaF4VBrHoz7MdDQ4E2jQzA"
 
 [programs.devnet]
 vortex_hub = "F8LBtNiwU4b7XZ2X9oNEfSghSJ7B2ZgqvZC1DtqgUewr"
 vortex_token_weighted = "HGy7TqBWCxacyVoznw4UciYdcdwpmJ7JdCoZu8XTTHQ"
 vortex_quadratic = "5zF3LgrJgKwYGVtPJuxD5NTyznuoD2nhbHhBawG5gFH7"
+vortex_optimistic = "5GtCoYyrczVv1sZfXqi9qjqHEqoM4QaU9cg2nkzV3Z6c"
+vortex_board = "5FLdbqX8Q6FsFZSPxiFK3ftaF4VBrHoz7MdDQ4E2jQzA"
 
 [provider]
 cluster = "localnet"

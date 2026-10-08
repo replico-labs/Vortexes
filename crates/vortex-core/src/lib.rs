@@ -154,6 +154,32 @@ pub enum GovError {
     GovernanceNotInitialized,
     #[msg("Already the DAO's governance program")]
     AlreadyActive,
+    #[msg("Only the board's signers can do this")]
+    NotSigner,
+    #[msg("Already a signer")]
+    AlreadySigner,
+    #[msg("Too many signers")]
+    TooManySigners,
+    #[msg("Required approvals must be between 1 and the number of signers")]
+    InvalidApprovals,
+    #[msg("Already confirmed")]
+    AlreadyConfirmed,
+    #[msg("You haven't confirmed this proposal")]
+    NotConfirmedBySigner,
+    #[msg("Not enough current signers have confirmed")]
+    ThresholdNotMet,
+    #[msg("The challenge window has closed")]
+    ChallengeWindowClosed,
+    #[msg("The challenge window is still open")]
+    ChallengeWindowOpen,
+    #[msg("Already challenged")]
+    AlreadyChallenged,
+    #[msg("This proposal wasn't challenged")]
+    NotChallenged,
+    #[msg("The bond has already been settled")]
+    BondAlreadyResolved,
+    #[msg("Challenge period must be longer than zero")]
+    InvalidChallengePeriod,
 }
 
 /// A DAO's voting rules. Times are in seconds.

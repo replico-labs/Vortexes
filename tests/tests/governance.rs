@@ -1,485 +1,7 @@
-//! Vortexes end to end: the compiled hub, token-weighted and quadratic
-//! programs in LiteSVM, with the real SPL Token, Token-2022 and Associated
-//! Token programs. Build first with `anchor build`.
-//!
-//! token-weighted and quadratic share their source (token_voting.rs), so
-//! their instructions and accounts have identical layouts: the helpers
-//! build them with token-weighted's types and point them at either
-//! program by ID.
+//! Token-weighted and quadratic through the hub, the hub's own checks, and
+//! switching between models. Build first with `anchor build`.
 
-use anchor_lang::{
-    prelude::{AccountMeta, Pubkey},
-    AccountDeserialize, InstructionData, ToAccountMetas,
-};
-use litesvm::{types::FailedTransactionMetadata, LiteSVM};
-use litesvm_token::{CreateAssociatedTokenAccount, CreateMint, MintTo};
-use solana_clock::Clock;
-use solana_instruction::Instruction;
-use solana_instruction_error::InstructionError;
-use solana_keypair::Keypair;
-use solana_message::Message;
-use solana_signer::Signer;
-use solana_transaction::{Transaction, TransactionError};
-use vortex_core::{GovError, ProposalState, StoredAccountMeta, StoredInstruction, VotingConfig, GOVERNANCE_SEED};
-use vortex_hub as hub;
-use vortex_token_weighted::{self as tw, Governance, Proposal, VoteChoice, Voter};
-
-const DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../target/deploy/");
-const START: i64 = 1_800_000_000;
-const TW: Pubkey = tw::ID;
-const QV: Pubkey = vortex_quadratic::ID;
-const SYSTEM: Pubkey = anchor_lang::system_program::ID;
-
-fn config() -> VotingConfig {
-    VotingConfig {
-        quorum_bps: 1_000,   // 10%
-        approval_bps: 6_000, // 60%
-        voting_delay: 10,
-        voting_period: 100,
-        timelock: 50,
-        execution_period: 200,
-        proposal_threshold: 100,
-    }
-}
-
-struct Member {
-    kp: Keypair,
-    ata: Pubkey,
-}
-
-struct Env {
-    svm: LiteSVM,
-    admin: Keypair,
-    creator: Keypair,
-    mint: Pubkey,
-    token_program: Pubkey,
-    dao: Pubkey,
-    treasury: Pubkey,
-}
-
-impl Env {
-    fn new() -> Self {
-        Self::with_token_program(litesvm_token::TOKEN_ID)
-    }
-
-    fn with_token_program(token_program: Pubkey) -> Self {
-        let mut svm = LiteSVM::new();
-        for (id, name) in [(hub::ID, "vortex_hub"), (TW, "vortex_token_weighted"), (QV, "vortex_quadratic")] {
-            if let Err(e) = svm.add_program_from_file(id, format!("{DIR}{name}.so")) {
-                panic!(
-                    "couldn't load {name}.so ({e:?}). Build with `anchor build`, not a bare `cargo-build-sbf` at the root: \
-                     building everything at once strips the hub's entry point."
-                );
-            }
-        }
-        let admin = Keypair::new();
-        let creator = Keypair::new();
-        svm.airdrop(&admin.pubkey(), 100_000_000_000).unwrap();
-        svm.airdrop(&creator.pubkey(), 100_000_000_000).unwrap();
-        let mut clock: Clock = svm.get_sysvar();
-        clock.unix_timestamp = START;
-        svm.set_sysvar(&clock);
-        let mint = if token_program == litesvm_token::TOKEN_ID {
-            CreateMint::new(&mut svm, &creator).decimals(6).send().unwrap()
-        } else {
-            create_mint_2022(&mut svm, &creator)
-        };
-        let mut env = Env { svm, admin, creator, mint, token_program, dao: Pubkey::default(), treasury: Pubkey::default() };
-
-        // The hub and its approved models.
-        let admin_kp = env.admin.insecure_clone();
-        env.send(&[env.ix_init_hub()], &[&admin_kp]).unwrap();
-        env.send(&[env.ix_set_model(TW, "token-weighted", true), env.ix_set_model(QV, "quadratic", true)], &[&admin_kp]).unwrap();
-
-        // A DAO run by token-weighted: hub record + its setup there, in one transaction.
-        let create_key = Keypair::new();
-        env.dao = Pubkey::find_program_address(&[hub::DAO_SEED, create_key.pubkey().as_ref()], &hub::ID).0;
-        env.treasury = hub::treasury_address(&env.dao);
-        let creator_kp = env.creator.insecure_clone();
-        let create = env.ix_create_dao("Ark", TW, &create_key.pubkey());
-        let init = env.ix_init_governance(TW, &creator_kp.pubkey(), &creator_kp.pubkey(), config());
-        env.send(&[create, init], &[&creator_kp, &create_key]).unwrap();
-        env
-    }
-
-    fn send(&mut self, ixs: &[Instruction], signers: &[&Keypair]) -> Result<(), FailedTransactionMetadata> {
-        let fee_payer = signers[0].pubkey();
-        let tx = Transaction::new(signers, Message::new(ixs, Some(&fee_payer)), self.svm.latest_blockhash());
-        let res = self.svm.send_transaction(tx).map(|_| ());
-        self.svm.expire_blockhash();
-        res
-    }
-
-    fn now(&self) -> i64 {
-        self.svm.get_sysvar::<Clock>().unix_timestamp
-    }
-
-    fn warp(&mut self, to: i64) {
-        let mut clock: Clock = self.svm.get_sysvar();
-        clock.unix_timestamp = to;
-        self.svm.set_sysvar(&clock);
-    }
-
-    // ---- addresses ----
-
-    fn hub_pda() -> Pubkey {
-        Pubkey::find_program_address(&[hub::HUB_SEED], &hub::ID).0
-    }
-
-    fn model_pda(program: &Pubkey) -> Pubkey {
-        Pubkey::find_program_address(&[hub::MODEL_SEED, program.as_ref()], &hub::ID).0
-    }
-
-    fn governance(&self, gp: Pubkey) -> Pubkey {
-        Pubkey::find_program_address(&[GOVERNANCE_SEED, self.dao.as_ref()], &gp).0
-    }
-
-    fn vault(&self, gp: Pubkey) -> Pubkey {
-        Pubkey::find_program_address(&[tw::VAULT_SEED, self.governance(gp).as_ref()], &gp).0
-    }
-
-    fn voter_pda(&self, gp: Pubkey, owner: &Pubkey) -> Pubkey {
-        Pubkey::find_program_address(&[tw::VOTER_SEED, self.governance(gp).as_ref(), owner.as_ref()], &gp).0
-    }
-
-    fn proposal_pda(&self, gp: Pubkey, id: u64) -> Pubkey {
-        Pubkey::find_program_address(&[tw::PROPOSAL_SEED, self.governance(gp).as_ref(), &id.to_le_bytes()], &gp).0
-    }
-
-    fn vote_pda(&self, gp: Pubkey, proposal: &Pubkey, owner: &Pubkey) -> Pubkey {
-        Pubkey::find_program_address(&[tw::VOTE_SEED, proposal.as_ref(), owner.as_ref()], &gp).0
-    }
-
-    // ---- hub instructions ----
-
-    fn ix_init_hub(&self) -> Instruction {
-        Instruction {
-            program_id: hub::ID,
-            accounts: hub::accounts::InitHub { admin: self.admin.pubkey(), hub: Self::hub_pda(), system_program: SYSTEM }.to_account_metas(None),
-            data: hub::instruction::InitHub {}.data(),
-        }
-    }
-
-    fn ix_set_model(&self, program: Pubkey, name: &str, enabled: bool) -> Instruction {
-        Instruction {
-            program_id: hub::ID,
-            accounts: hub::accounts::SetModel { admin: self.admin.pubkey(), hub: Self::hub_pda(), model: Self::model_pda(&program), system_program: SYSTEM }
-                .to_account_metas(None),
-            data: hub::instruction::SetModel { program_id: program, name: name.into(), enabled }.data(),
-        }
-    }
-
-    fn ix_create_dao(&self, name: &str, gp: Pubkey, create_key: &Pubkey) -> Instruction {
-        Instruction {
-            program_id: hub::ID,
-            accounts: hub::accounts::CreateDao {
-                creator: self.creator.pubkey(),
-                create_key: *create_key,
-                model: Self::model_pda(&gp),
-                dao: Pubkey::find_program_address(&[hub::DAO_SEED, create_key.as_ref()], &hub::ID).0,
-                system_program: SYSTEM,
-            }
-            .to_account_metas(None),
-            data: hub::instruction::CreateDao { name: name.into(), governance_program: gp }.data(),
-        }
-    }
-
-    fn ix_propose_switch(&self, to: Pubkey) -> Instruction {
-        Instruction {
-            program_id: hub::ID,
-            accounts: hub::accounts::ProposeSwitch { treasury: self.treasury, dao: self.dao, model: Self::model_pda(&to) }.to_account_metas(None),
-            data: hub::instruction::ProposeSwitch { new_program: to }.data(),
-        }
-    }
-
-    fn ix_cancel_switch(&self) -> Instruction {
-        Instruction {
-            program_id: hub::ID,
-            accounts: hub::accounts::TreasuryOnly { treasury: self.treasury, dao: self.dao }.to_account_metas(None),
-            data: hub::instruction::CancelSwitch {}.data(),
-        }
-    }
-
-    fn apply_switch(&mut self, to: Pubkey) -> Result<(), FailedTransactionMetadata> {
-        let ix = Instruction {
-            program_id: hub::ID,
-            accounts: hub::accounts::ApplySwitch { dao: self.dao, model: Self::model_pda(&to), new_governance: self.governance(to) }.to_account_metas(None),
-            data: hub::instruction::ApplySwitch {}.data(),
-        };
-        let admin = self.admin.insecure_clone();
-        self.send(&[ix], &[&admin])
-    }
-
-    /// Runs a proposal through the hub, passing every account its instructions use.
-    fn execute(&mut self, gp: Pubkey, proposal: Pubkey) -> Result<(), FailedTransactionMetadata> {
-        let p = self.proposal_account(proposal);
-        let mut accounts = hub::accounts::Execute {
-            dao: self.dao,
-            executor: hub::executor_address(&self.dao),
-            governance_program: gp,
-            governance: self.governance(gp),
-            proposal,
-        }
-        .to_account_metas(None);
-        for ix in &p.core.instructions {
-            for m in &ix.accounts {
-                // The treasury signs inside the hub, not in the transaction.
-                accounts.push(AccountMeta { pubkey: m.pubkey, is_signer: false, is_writable: m.is_writable });
-            }
-            accounts.push(AccountMeta::new_readonly(ix.program_id, false));
-        }
-        let ix = Instruction { program_id: hub::ID, accounts, data: hub::instruction::Execute {}.data() };
-        let admin = self.admin.insecure_clone();
-        self.send(&[ix], &[&admin])
-    }
-
-    // ---- voting-program instructions (same layout in both programs) ----
-
-    fn ix_init_governance(&self, gp: Pubkey, authority: &Pubkey, payer: &Pubkey, config: VotingConfig) -> Instruction {
-        Instruction {
-            program_id: gp,
-            accounts: tw::accounts::InitGovernance {
-                authority: *authority,
-                payer: *payer,
-                hub_dao: self.dao,
-                governance: self.governance(gp),
-                mint: self.mint,
-                vault: self.vault(gp),
-                token_program: self.token_program,
-                system_program: SYSTEM,
-            }
-            .to_account_metas(None),
-            data: tw::instruction::InitGovernance { config }.data(),
-        }
-    }
-
-    fn member(&mut self, tokens: u64) -> Member {
-        let kp = Keypair::new();
-        self.svm.airdrop(&kp.pubkey(), 10_000_000_000).unwrap();
-        let ata = if self.token_program == litesvm_token::TOKEN_ID {
-            let creator = self.creator.insecure_clone();
-            let ata = CreateAssociatedTokenAccount::new(&mut self.svm, &creator, &self.mint).owner(&kp.pubkey()).send().unwrap();
-            if tokens > 0 {
-                MintTo::new(&mut self.svm, &creator, &self.mint, &ata, tokens).send().unwrap();
-            }
-            ata
-        } else {
-            self.ata_2022(&kp.pubkey(), tokens)
-        };
-        Member { kp, ata }
-    }
-
-    fn deposit(&mut self, gp: Pubkey, m: &Member, amount: u64) -> Result<(), FailedTransactionMetadata> {
-        let ix = Instruction {
-            program_id: gp,
-            accounts: tw::accounts::Deposit {
-                owner: m.kp.pubkey(),
-                governance: self.governance(gp),
-                voter: self.voter_pda(gp, &m.kp.pubkey()),
-                owner_token_account: m.ata,
-                vault: self.vault(gp),
-                mint: self.mint,
-                token_program: self.token_program,
-                system_program: SYSTEM,
-            }
-            .to_account_metas(None),
-            data: tw::instruction::Deposit { amount }.data(),
-        };
-        self.send(&[ix], &[&m.kp])
-    }
-
-    fn withdraw(&mut self, gp: Pubkey, m: &Member, amount: u64) -> Result<(), FailedTransactionMetadata> {
-        let ix = Instruction {
-            program_id: gp,
-            accounts: tw::accounts::Withdraw {
-                owner: m.kp.pubkey(),
-                governance: self.governance(gp),
-                voter: self.voter_pda(gp, &m.kp.pubkey()),
-                owner_token_account: m.ata,
-                vault: self.vault(gp),
-                mint: self.mint,
-                token_program: self.token_program,
-            }
-            .to_account_metas(None),
-            data: tw::instruction::Withdraw { amount }.data(),
-        };
-        self.send(&[ix], &[&m.kp])
-    }
-
-    fn propose(&mut self, gp: Pubkey, m: &Member, instructions: Vec<StoredInstruction>) -> Result<(u64, Pubkey), FailedTransactionMetadata> {
-        let id = self.governance_account(gp).proposal_count + 1;
-        let proposal = self.proposal_pda(gp, id);
-        let voter = self.voter_pda(gp, &m.kp.pubkey());
-        let has_voter = self.svm.get_account(&voter).is_some_and(|a| a.lamports > 0);
-        let ix = Instruction {
-            program_id: gp,
-            accounts: tw::accounts::Propose {
-                proposer: m.kp.pubkey(),
-                governance: self.governance(gp),
-                hub_dao: self.dao,
-                voter: has_voter.then_some(voter),
-                proposal,
-                system_program: SYSTEM,
-            }
-            .to_account_metas(None),
-            data: tw::instruction::Propose { id, metadata_uri: "Pay the community call host".into(), instructions }.data(),
-        };
-        self.send(&[ix], &[&m.kp]).map(|_| (id, proposal))
-    }
-
-    fn vote(&mut self, gp: Pubkey, m: &Member, proposal: Pubkey, choice: VoteChoice) -> Result<(), FailedTransactionMetadata> {
-        let ix = Instruction {
-            program_id: gp,
-            accounts: tw::accounts::CastVote {
-                owner: m.kp.pubkey(),
-                governance: self.governance(gp),
-                proposal,
-                voter: self.voter_pda(gp, &m.kp.pubkey()),
-                vote_record: self.vote_pda(gp, &proposal, &m.kp.pubkey()),
-                system_program: SYSTEM,
-            }
-            .to_account_metas(None),
-            data: tw::instruction::CastVote { choice }.data(),
-        };
-        self.send(&[ix], &[&m.kp])
-    }
-
-    fn queue(&mut self, gp: Pubkey, proposal: Pubkey) -> Result<(), FailedTransactionMetadata> {
-        let ix = Instruction {
-            program_id: gp,
-            accounts: tw::accounts::Queue { governance: self.governance(gp), proposal }.to_account_metas(None),
-            data: tw::instruction::Queue {}.data(),
-        };
-        let admin = self.admin.insecure_clone();
-        self.send(&[ix], &[&admin])
-    }
-
-    fn cancel(&mut self, gp: Pubkey, who: &Keypair, proposal: Pubkey) -> Result<(), FailedTransactionMetadata> {
-        let ix = Instruction {
-            program_id: gp,
-            accounts: tw::accounts::Cancel { authority: who.pubkey(), governance: self.governance(gp), proposal }.to_account_metas(None),
-            data: tw::instruction::Cancel {}.data(),
-        };
-        self.send(&[ix], &[who])
-    }
-
-    /// Propose, vote it through with `voter`, queue, and wait out the
-    /// timelock. Returns the proposal and when it became executable.
-    fn pass(&mut self, gp: Pubkey, voter: &Member, instructions: Vec<StoredInstruction>) -> Pubkey {
-        let (_, p) = self.propose(gp, voter, instructions).unwrap();
-        let prop = self.proposal_account(p);
-        self.warp(prop.voting_starts_at);
-        self.vote(gp, voter, p, VoteChoice::For).unwrap();
-        self.warp(prop.voting_ends_at);
-        self.queue(gp, p).unwrap();
-        self.warp(prop.voting_ends_at + config().timelock as i64);
-        p
-    }
-
-    // ---- reads ----
-
-    fn hub_dao(&self) -> hub::Dao {
-        hub::Dao::try_deserialize(&mut self.svm.get_account(&self.dao).unwrap().data.as_slice()).unwrap()
-    }
-
-    fn governance_account(&self, gp: Pubkey) -> Governance {
-        Governance::try_deserialize(&mut self.svm.get_account(&self.governance(gp)).unwrap().data.as_slice()).unwrap()
-    }
-
-    fn proposal_account(&self, p: Pubkey) -> Proposal {
-        Proposal::try_deserialize(&mut self.svm.get_account(&p).unwrap().data.as_slice()).unwrap()
-    }
-
-    fn voter_account(&self, gp: Pubkey, owner: &Pubkey) -> Voter {
-        Voter::try_deserialize(&mut self.svm.get_account(&self.voter_pda(gp, owner)).unwrap().data.as_slice()).unwrap()
-    }
-
-    fn token_balance(&self, account: &Pubkey) -> u64 {
-        litesvm_token::get_spl_account::<litesvm_token::spl_token::state::Account>(&self.svm, account).unwrap().amount
-    }
-
-    fn lamports(&self, account: &Pubkey) -> u64 {
-        self.svm.get_account(account).map_or(0, |a| a.lamports)
-    }
-
-    fn state(&self, gp: Pubkey, proposal: Pubkey) -> ProposalState {
-        self.proposal_account(proposal).state(&self.governance_account(gp).config, self.now())
-    }
-
-    // ---- stored instructions ----
-
-    fn pay_sol(&self, to: &Pubkey, lamports: u64) -> StoredInstruction {
-        stored(solana_system_interface::instruction::transfer(&self.treasury, to, lamports))
-    }
-
-    fn update_config_ix(&self, gp: Pubkey, config: VotingConfig) -> StoredInstruction {
-        stored(Instruction {
-            program_id: gp,
-            accounts: tw::accounts::UpdateConfig { treasury: self.treasury, governance: self.governance(gp) }.to_account_metas(None),
-            data: tw::instruction::UpdateConfig { config }.data(),
-        })
-    }
-
-    /// `owner`'s Token-2022 associated account, holding `tokens`.
-    fn ata_2022(&mut self, owner: &Pubkey, tokens: u64) -> Pubkey {
-        use spl_token_2022_interface::{instruction::mint_to_checked, ID};
-        let ata = spl_associated_token_account_interface::address::get_associated_token_address_with_program_id(owner, &self.mint, &ID);
-        let mut ixs = vec![spl_associated_token_account_interface::instruction::create_associated_token_account(&self.creator.pubkey(), owner, &self.mint, &ID)];
-        if tokens > 0 {
-            ixs.push(mint_to_checked(&ID, &self.mint, &ata, &self.creator.pubkey(), &[], tokens, 6).unwrap());
-        }
-        let creator = self.creator.insecure_clone();
-        self.send(&ixs, &[&creator]).unwrap();
-        ata
-    }
-}
-
-/// A Token-2022 mint (no extensions) with `payer` as mint authority.
-fn create_mint_2022(svm: &mut LiteSVM, payer: &Keypair) -> Pubkey {
-    use anchor_lang::solana_program::program_pack::Pack;
-    use spl_token_2022_interface::{instruction::initialize_mint2, state::Mint, ID};
-    let mint = Keypair::new();
-    let rent = svm.minimum_balance_for_rent_exemption(Mint::LEN);
-    let ixs = [
-        solana_system_interface::instruction::create_account(&payer.pubkey(), &mint.pubkey(), rent, Mint::LEN as u64, &ID),
-        initialize_mint2(&ID, &mint.pubkey(), &payer.pubkey(), None, 6).unwrap(),
-    ];
-    let tx = Transaction::new(&[payer, &mint], Message::new(&ixs, Some(&payer.pubkey())), svm.latest_blockhash());
-    svm.send_transaction(tx).unwrap();
-    mint.pubkey()
-}
-
-fn stored(ix: Instruction) -> StoredInstruction {
-    StoredInstruction {
-        program_id: ix.program_id,
-        accounts: ix.accounts.iter().map(|m| StoredAccountMeta { pubkey: m.pubkey, is_signer: m.is_signer, is_writable: m.is_writable }).collect(),
-        data: ix.data,
-    }
-}
-
-/// The custom error a failed transaction ended with.
-fn code<T: std::fmt::Debug>(res: Result<T, FailedTransactionMetadata>) -> u32 {
-    let failed = res.expect_err("expected the transaction to fail");
-    match failed.err {
-        TransactionError::InstructionError(_, InstructionError::Custom(c)) => c,
-        other => panic!("not a custom error: {other:?}\n{:#?}", failed.meta.logs),
-    }
-}
-
-fn err(e: GovError) -> u32 {
-    u32::from(e)
-}
-
-/// Alice 600, Bob 400 deposited in token-weighted; treasury holds 5 SOL.
-fn dao_with_members() -> (Env, Member, Member) {
-    let mut env = Env::new();
-    let alice = env.member(1_000);
-    let bob = env.member(1_000);
-    env.deposit(TW, &alice, 600).unwrap();
-    env.deposit(TW, &bob, 400).unwrap();
-    env.svm.airdrop(&env.treasury, 5_000_000_000).unwrap();
-    (env, alice, bob)
-}
+use vortex_tests::*;
 
 // ---------------------------------------------------------------
 // Voting and executing through the hub
@@ -938,4 +460,51 @@ fn switching_back_leaves_old_proposals_dead() {
     let p = env.pass(TW, &alice, vec![env.pay_sol(&alice.kp.pubkey(), 9)]);
     assert_eq!(env.proposal_account(p).core.epoch, 3);
     env.execute(TW, p).unwrap();
+}
+
+#[test]
+fn one_dao_through_three_models_keeps_one_treasury() {
+    let (mut env, alice, _bob) = dao_with_members();
+    let treasury = env.treasury;
+    let s1 = Keypair::new();
+    let s2 = Keypair::new();
+    for s in [&s1, &s2] {
+        env.svm.airdrop(&s.pubkey(), 10_000_000_000).unwrap();
+    }
+
+    // token-weighted -> board (2 of 2), set up by the treasury in the same proposal.
+    let init_board = stored(env.ix_init_board(&env.treasury, &env.treasury, vec![s1.pubkey(), s2.pubkey()], board_config(2)));
+    let to_board = env.pass(TW, &alice, vec![stored(env.ix_propose_switch(BOARD)), init_board]);
+    env.execute(TW, to_board).unwrap();
+    env.warp(env.hub_dao().pending_switch.unwrap().ready_at);
+    env.apply_switch(BOARD).unwrap();
+    assert_eq!((env.hub_dao().governance_program, env.hub_dao().epoch), (BOARD, 2));
+
+    // The board pays someone, then moves the DAO to optimistic.
+    let paid = Keypair::new().pubkey();
+    let pay = env.board_propose(&s1, vec![env.pay_sol(&paid, 1_000_000)]).unwrap();
+    env.board_confirm(&s2, pay).unwrap();
+    let init_opt = stored(env.ix_init_optimistic(&env.treasury, &env.treasury, opt_config()));
+    let to_opt = env.board_propose(&s1, vec![stored(env.ix_propose_switch(OPT)), init_opt]).unwrap();
+    env.board_confirm(&s2, to_opt).unwrap();
+    let t = env.now();
+    env.warp(t + 50);
+    env.execute(BOARD, pay).unwrap();
+    env.execute(BOARD, to_opt).unwrap();
+    env.warp(env.hub_dao().pending_switch.unwrap().ready_at);
+    env.apply_switch(OPT).unwrap();
+    assert_eq!((env.hub_dao().governance_program, env.hub_dao().epoch), (OPT, 3));
+
+    // Optimistic pays from the same treasury.
+    env.withdraw(TW, &alice, 600).unwrap();
+    env.deposit(OPT, &alice, 600).unwrap();
+    let (_, p) = env.propose(OPT, &alice, vec![env.pay_sol(&paid, 2_000_000)]).unwrap();
+    let t = env.now();
+    env.warp(t + 30);
+    env.finalize_unchallenged(p).unwrap();
+    env.warp(t + 80);
+    env.execute(OPT, p).unwrap();
+    assert_eq!(env.lamports(&paid), 3_000_000);
+    assert_eq!(env.treasury, treasury);
+    assert_eq!(hub::treasury_address(&env.dao), treasury);
 }

@@ -16,8 +16,8 @@ A DAO is split in two:
 | `vortex-hub` | DAO records, treasuries, approved models, execution, switching | Built, tested |
 | `vortex-token-weighted` | Deposit tokens, vote for / against / abstain, quorum + approval, timelock | Built, tested |
 | `vortex-quadratic` | Same, but a deposit of n tokens gives √n votes | Built, tested |
-| `vortex-optimistic` | Passes after a challenge window unless challenged | Planned |
-| `vortex-board` | Signers confirm; passes at the required number | Planned |
+| `vortex-optimistic` | Passes after a challenge window unless challenged; a challenge starts a token vote | Built, tested |
+| `vortex-board` | Signers confirm; passes at the required number | Built, tested |
 | `vortex-core` | Shared library compiled into the programs above (not deployed) | — |
 
 The split mirrors the EVM version, where `Treasury.sol` is its own contract and `transferGovernance` hands it to a new governance contract. The hub's confirmation comes back through the CPI return data of the governance program it called, so a decision can't be forged.
@@ -61,7 +61,35 @@ The two share one source file, `programs/token-weighted/src/token_voting.rs`. Ea
 - **No snapshots:** Solana tokens have no balance history, so a member who votes can't withdraw until every proposal they voted on has closed. The same tokens can't vote twice from another wallet.
 - **Times are seconds,** not blocks.
 
+## Optimistic
+
+Proposals pass by default; only disputed ones go to a vote.
+
+- **Deposits** work as in token-weighted: members deposit the DAO's token into its vault, and the deposit is their voting power if a vote is needed. Proposing needs `proposal_threshold` deposited.
+- **Challenge window:** for `challenge_period` seconds after proposing, anyone can challenge by posting `challenge_bond` tokens from their wallet into the bond vault. One challenge per proposal.
+- **Unchallenged:** once the window closes, anyone calls `finalize_unchallenged` and the proposal is queued.
+- **Challenged:** a token vote runs for `voting_period` (for, against or abstain, weighted by deposit; voters' deposits lock until it closes). It passes with the same quorum and approval rules as token-weighted. Then anyone calls `finalize_challenge`:
+  - passed: the proposal is queued and the bond goes to the DAO's treasury token account;
+  - failed: the bond goes back to the challenger's token account.
+
+  Only the account being paid is passed in, and its owner is checked.
+- **Running:** queued proposals run through the hub after `timelock`, within `execution_period`.
+- **Cancel:** the proposer, or the DAO through a proposal. If a challenged proposal is cancelled before it's settled, anyone can call `reclaim_bond` to return the bond to the challenger. (In the EVM contract that bond stays stuck.)
+- **Rules** (`update_config`) change only through a passed proposal; a zero challenge window is refused.
+
+## Board
+
+A multisig. There's no token; power is being a signer (up to 20).
+
+- **Proposing:** only signers propose, and proposing counts as the proposer's confirmation.
+- **Confirming:** other signers `confirm`. Once `required_approvals` have confirmed, the proposal is queued. A signer can `revoke_confirmation`; if that drops it below the threshold, it's unqueued.
+- **Running:** after `timelock`, within `execution_period`, through the hub. Only confirmations from people who are *still* signers count at that moment, so removing a signer also removes their pending confirmations. (In the EVM contract they keep counting.)
+- **Cancel:** the proposer, or the DAO through a proposal.
+- **Signers and rules** (`add_signer`, `remove_signer`, `update_config`) change only through a passed proposal, never directly, not even by a signer. `required_approvals` must stay between 1 and the number of signers, and removing a signer that would break that is refused.
+
 ## Accounts
+
+"voting" means token-weighted, quadratic and optimistic, which share these layouts.
 
 | Program | Account | Seeds | Holds |
 |---|---|---|---|
@@ -75,6 +103,9 @@ The two share one source file, `programs/token-weighted/src/token_voting.rs`. Ea
 | voting | Voter | `["voter", governance, owner]` | a member's deposit and when it unlocks |
 | voting | Proposal | `["proposal", governance, id]` | `ProposalCore`, timing, tally |
 | voting | Vote record | `["vote", proposal, owner]` | one per voter per proposal; closable for its rent after voting |
+| optimistic | Bond vault | `["bond_vault", governance]` | challenge bonds until settled (authority = governance) |
+| board | Governance | `["governance", dao]` | signers, rules, proposal count |
+| board | Proposal | `["proposal", governance, id]` | `ProposalCore`, confirmations, timing |
 
 ## Adding a governance model
 
@@ -100,7 +131,9 @@ Use `anchor build`, not a bare `cargo-build-sbf` at the root: the voting program
 The tests run the compiled programs in [LiteSVM](https://github.com/LiteSVM/litesvm) with the real SPL Token, Token-2022 and Associated Token programs. They cover:
 - **Voting through the hub:** the full lifecycle paying SOL and tokens from the treasury; one vote each and locked deposits; threshold and signer checks; defeat by approval and by quorum; abstain; expiry; cancelling; rule changes only by proposal; a proposal re-executing itself; closing vote records; another mint's vault refused; Token-2022.
 - **The hub:** only the hub can confirm executions; it only trusts the DAO's own governance program; only approved models; only the admin approves; only the creator does the first setup.
-- **Switching:** token-weighted → quadratic with the same treasury (√ weights checked); the 2-day delay; cancelling a pending switch; disabled or same-model switches refused; the new model must be set up first; switching back leaves old proposals dead.
+- **Switching:** token-weighted → quadratic with the same treasury (√ weights checked); one DAO through token-weighted → board → optimistic with one treasury; the 2-day delay; cancelling a pending switch; disabled or same-model switches refused; the new model must be set up first; switching back leaves old proposals dead.
+- **Optimistic:** unchallenged proposals pass after the window; a failed challenge pays the bond to the treasury; a successful one returns it to the challenger and nobody else; cancelled proposals' bonds can be reclaimed; the proposal threshold; rule changes only by proposal.
+- **Board:** 2-of-3 end to end; outsiders can't propose or confirm; revoking below the threshold unqueues; signers and rules change only by proposal; a removed signer's confirmation stops counting; who can cancel; bad boards refused at setup.
 
 `idl/` holds the IDLs for clients (the bot); copy them from `target/idl/` after changing a program. Error codes come from `GovError` in `vortex-core` and are the same in every program: 6000 is its first variant, 6001 the second, and so on.
 
