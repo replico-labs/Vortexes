@@ -86,8 +86,6 @@ anchor build      # programs into target/deploy/, IDLs into target/idl/
 cargo test        # unit tests + end-to-end tests (needs the build above)
 ```
 
-Use `anchor build`, not a bare `cargo-build-sbf` at the root: building everything in one go builds the hub without its entry point.
-
 The end-to-end tests run the compiled programs in [LiteSVM](https://github.com/LiteSVM/litesvm) with the real SPL Token, Token-2022 and Associated Token programs. Current result: **52 end-to-end tests and 10 unit tests passed, 0 failed**. They cover every model's lifecycle, the hub's checks, switching between models with one treasury, and budgets.
 
 `idl/` holds the IDLs for clients such as the bot; copy them from `target/idl/` after changing a program. Error codes come from `GovError` in `vortex-core` and are the same in every program.
