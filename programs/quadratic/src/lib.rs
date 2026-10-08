@@ -1,21 +1,23 @@
-//! Vortexes token-weighted governance: one deposited token, one vote. The
-//! Solana counterpart of the EVM `Governance.sol`.
+//! Vortexes quadratic governance: a deposit of n tokens gives sqrt(n)
+//! votes, so large holders count for less. The Solana counterpart of the
+//! EVM `QuadraticGovernance.sol`; quorum is measured against
+//! sqrt(all deposits), and the proposal threshold stays in raw tokens, as
+//! there.
 //!
-//! The voting itself lives in `token_voting.rs`, shared with
-//! vortex-quadratic; this file only sets the program's ID and how a deposit
-//! turns into votes. Money and execution live in vortex-hub.
+//! Everything else is token-weighted's voting, shared through
+//! `token_voting.rs` so the two can't drift apart.
 
-declare_id!("HGy7TqBWCxacyVoznw4UciYdcdwpmJ7JdCoZu8XTTHQ");
+declare_id!("5zF3LgrJgKwYGVtPJuxD5NTyznuoD2nhbHhBawG5gFH7");
 
-/// Votes for a deposit of `deposit` raw tokens: one each.
+/// Votes for a deposit of `deposit` raw tokens: its integer square root.
 pub fn vote_weight(deposit: u64) -> u64 {
-    deposit
+    deposit.isqrt()
 }
 
-include!("token_voting.rs");
+include!("../../token-weighted/src/token_voting.rs");
 
 #[program]
-pub mod vortex_token_weighted {
+pub mod vortex_quadratic {
     use super::*;
 
     /// Sets up a hub DAO in this program (creator after create_dao, or the

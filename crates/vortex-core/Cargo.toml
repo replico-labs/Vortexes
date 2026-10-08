@@ -10,3 +10,4 @@ idl-build = ["anchor-lang/idl-build"]
 
 [dependencies]
 anchor-lang = { workspace = true }
+const-crypto = "0.3.0"

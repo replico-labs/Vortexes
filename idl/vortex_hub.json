@@ -1,0 +1,856 @@
+{
+  "address": "F8LBtNiwU4b7XZ2X9oNEfSghSJ7B2ZgqvZC1DtqgUewr",
+  "metadata": {
+    "name": "vortex_hub",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Vortexes hub: every DAO's record and treasury, the approved governance models, running passed proposals, and switching a DAO's governance."
+  },
+  "instructions": [
+    {
+      "name": "apply_switch",
+      "docs": [
+        "Applies a pending switch once its delay has passed. Anyone can call",
+        "it; the DAO must already be set up in the new program."
+      ],
+      "discriminator": [
+        93,
+        17,
+        187,
+        181,
+        173,
+        129,
+        39,
+        125
+      ],
+      "accounts": [
+        {
+          "name": "dao",
+          "writable": true
+        },
+        {
+          "name": "model"
+        },
+        {
+          "name": "new_governance"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_switch",
+      "docs": [
+        "Calls off a pending switch (again, only through a passed proposal)."
+      ],
+      "discriminator": [
+        126,
+        108,
+        235,
+        9,
+        11,
+        164,
+        232,
+        178
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dao",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_dao",
+      "docs": [
+        "Creates a DAO run by `governance_program`. In the same transaction,",
+        "the creator then sets up the DAO in that program (its rules,",
+        "signers or token)."
+      ],
+      "discriminator": [
+        88,
+        46,
+        92,
+        100,
+        95,
+        79,
+        229,
+        25
+      ],
+      "accounts": [
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "create_key",
+          "signer": true
+        },
+        {
+          "name": "model",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  100,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "governance_program"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dao",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  97,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "create_key"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "governance_program",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "execute",
+      "docs": [
+        "Runs a passed proposal. Anyone can call it. Pass every account the",
+        "proposal's instructions use (and the programs they call) as",
+        "remaining accounts."
+      ],
+      "discriminator": [
+        130,
+        221,
+        242,
+        154,
+        13,
+        193,
+        189,
+        29
+      ],
+      "accounts": [
+        {
+          "name": "dao",
+          "docs": [
+            "Not `mut`: a proposal may change it (propose_switch), and this",
+            "instruction must not write a stale copy back over that."
+          ]
+        },
+        {
+          "name": "executor",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  101,
+                  99,
+                  117,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
+        },
+        {
+          "name": "governance_program"
+        },
+        {
+          "name": "governance"
+        },
+        {
+          "name": "proposal",
+          "docs": [
+            "reads only its standard ProposalCore prefix."
+          ],
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "init_hub",
+      "docs": [
+        "One-time setup; the caller becomes the admin of the approved list."
+      ],
+      "discriminator": [
+        127,
+        92,
+        145,
+        28,
+        142,
+        197,
+        124,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "hub",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "propose_switch",
+      "docs": [
+        "Starts a switch to another approved governance program. Needs the",
+        "treasury's signature, so only a passed proposal can call it."
+      ],
+      "discriminator": [
+        29,
+        188,
+        179,
+        85,
+        212,
+        1,
+        115,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dao",
+          "writable": true
+        },
+        {
+          "name": "model",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  100,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "new_program"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_program",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_admin",
+      "discriminator": [
+        251,
+        163,
+        0,
+        52,
+        91,
+        194,
+        187,
+        92
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "hub"
+          ]
+        },
+        {
+          "name": "hub",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_model",
+      "docs": [
+        "Approves (or disables) a governance program."
+      ],
+      "discriminator": [
+        201,
+        11,
+        140,
+        164,
+        156,
+        124,
+        125,
+        154
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "hub"
+          ]
+        },
+        {
+          "name": "hub",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "model",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  100,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "program_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "program_id",
+          "type": "pubkey"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "enabled",
+          "type": "bool"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Dao",
+      "discriminator": [
+        163,
+        9,
+        47,
+        31,
+        52,
+        85,
+        197,
+        49
+      ]
+    },
+    {
+      "name": "Hub",
+      "discriminator": [
+        143,
+        189,
+        4,
+        120,
+        169,
+        234,
+        14,
+        125
+      ]
+    },
+    {
+      "name": "Model",
+      "discriminator": [
+        152,
+        221,
+        247,
+        122,
+        185,
+        125,
+        223,
+        151
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "DaoCreated",
+      "discriminator": [
+        143,
+        20,
+        10,
+        142,
+        248,
+        59,
+        188,
+        88
+      ]
+    },
+    {
+      "name": "ModelSet",
+      "discriminator": [
+        55,
+        2,
+        153,
+        119,
+        230,
+        126,
+        180,
+        100
+      ]
+    },
+    {
+      "name": "ProposalExecuted",
+      "discriminator": [
+        92,
+        213,
+        189,
+        201,
+        101,
+        83,
+        111,
+        83
+      ]
+    },
+    {
+      "name": "SwitchApplied",
+      "discriminator": [
+        50,
+        107,
+        188,
+        240,
+        41,
+        208,
+        32,
+        186
+      ]
+    },
+    {
+      "name": "SwitchCancelled",
+      "discriminator": [
+        46,
+        196,
+        183,
+        131,
+        1,
+        130,
+        141,
+        151
+      ]
+    },
+    {
+      "name": "SwitchProposed",
+      "discriminator": [
+        26,
+        254,
+        250,
+        97,
+        149,
+        194,
+        157,
+        166
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "Dao",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "create_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "governance_program",
+            "docs": [
+              "The governance program running the DAO now."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "governance",
+            "docs": [
+              "The DAO's account in that program: `[GOVERNANCE_SEED, dao]` there."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "Starts at 1 and goes up with every switch. Proposals only run in",
+              "the epoch they were made in."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "pending_switch",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PendingSwitch"
+                }
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "treasury_bump",
+            "type": "u8"
+          },
+          {
+            "name": "executor_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DaoCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "governance_program",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Hub",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "docs": [
+              "Manages the approved governance programs."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Model",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ModelSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "enabled",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PendingSwitch",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program",
+            "type": "pubkey"
+          },
+          {
+            "name": "ready_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "governance_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SwitchApplied",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SwitchCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SwitchProposed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "from",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "ready_at",
+            "type": "i64"
+          }
+        ]
+      }
+    }
+  ]
+}

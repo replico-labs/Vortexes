@@ -1,13 +1,13 @@
 [package]
-name = "vortex-token-weighted"
-description = "Vortexes token-weighted governance: deposit tokens, propose, vote for/against/abstain, quorum + approval, timelock, execute."
+name = "vortex-quadratic"
+description = "Vortexes quadratic governance: like token-weighted, but a deposit of n tokens gives sqrt(n) votes."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "vortex_token_weighted"
+name = "vortex_quadratic"
 
 [features]
 default = []

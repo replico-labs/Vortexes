@@ -1,10 +1,10 @@
 {
-  "address": "HGy7TqBWCxacyVoznw4UciYdcdwpmJ7JdCoZu8XTTHQ",
+  "address": "5zF3LgrJgKwYGVtPJuxD5NTyznuoD2nhbHhBawG5gFH7",
   "metadata": {
-    "name": "vortex_token_weighted",
+    "name": "vortex_quadratic",
     "version": "0.1.0",
     "spec": "0.1.0",
-    "description": "Vortexes token-weighted governance: deposit tokens, propose, vote for/against/abstain, quorum + approval, timelock, execute."
+    "description": "Vortexes quadratic governance: like token-weighted, but a deposit of n tokens gives sqrt(n) votes."
   },
   "instructions": [
     {

@@ -1,6 +1,6 @@
 [package]
 name = "vortex-tests"
-description = "End-to-end tests: the compiled programs running in LiteSVM with the real SPL Token program."
+description = "End-to-end tests: the compiled programs (built with `anchor build`) running in LiteSVM with the real token programs."
 version.workspace = true
 edition.workspace = true
 publish = false
@@ -21,4 +21,6 @@ spl-token-interface = "*"
 spl-token-2022-interface = "*"
 spl-associated-token-account-interface = "*"
 vortex-core = { path = "../crates/vortex-core" }
+vortex-hub = { path = "../programs/hub", features = ["no-entrypoint"] }
 vortex-token-weighted = { path = "../programs/token-weighted", features = ["no-entrypoint"] }
+vortex-quadratic = { path = "../programs/quadratic", features = ["no-entrypoint"] }

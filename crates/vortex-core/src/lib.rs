@@ -1,12 +1,18 @@
 //! Shared rules for the Vortexes governance programs.
 //!
-//! Each governance model is its own program; what they have in common
-//! lives here so it's written (and audited) once:
-//! - [`VotingConfig`] and its checks (same limits as the EVM contracts),
-//! - the proposal state machine ([`proposal_state`]) and pass rule
-//!   ([`passed`]): quorum over a base, approval over for + against,
-//! - [`StoredInstruction`]: what a proposal does when it executes, run by
-//!   [`execute_instructions`] with the DAO treasury PDA as the only signer.
+//! Vortexes splits a DAO in two:
+//! - **vortex-hub** holds the DAO's record and its treasury, runs passed
+//!   proposals, and records which governance program is in charge. One
+//!   hub serves every DAO.
+//! - **Governance programs** (token-weighted, quadratic, optimistic,
+//!   board, ...) only decide: proposals, votes, signers. Any approved one
+//!   can run a DAO, and a DAO can vote to switch to another without its
+//!   treasury moving.
+//!
+//! What they agree on lives here: the PDA seeds, the [`ProposalCore`] every
+//! proposal account starts with, the `confirm_execution` interface, plus
+//! the shared voting rules ([`VotingConfig`], [`proposal_state`],
+//! [`passed`]) and [`execute_instructions`].
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{
@@ -22,10 +28,57 @@ pub const MAX_URI_LEN: usize = 200;
 /// Longest DAO name.
 pub const MAX_NAME_LEN: usize = 32;
 
-/// Seed of a DAO's treasury PDA: `[TREASURY_SEED, dao]`. The treasury
-/// holds SOL directly (it's a system-owned address with no data) and owns
-/// the DAO's token accounts. It signs only inside an executing proposal.
+/// Hub PDA `[TREASURY_SEED, hub_dao]`: holds the DAO's SOL (a
+/// system-owned address with no data) and owns its token accounts. Only
+/// the hub signs for it, and only while running a passed proposal.
 pub const TREASURY_SEED: &[u8] = b"treasury";
+/// Hub PDA `[EXECUTOR_SEED, hub_dao]`: signs the hub's
+/// `confirm_execution` call, so a governance program knows the hub, and
+/// nobody else, is asking.
+pub const EXECUTOR_SEED: &[u8] = b"executor";
+/// Governance-program PDA `[GOVERNANCE_SEED, hub_dao]`: a DAO's state in
+/// that governance program (rules, counts, vault...).
+pub const GOVERNANCE_SEED: &[u8] = b"governance";
+
+/// The instruction every governance program implements for the hub.
+/// Accounts, in order: the hub's executor PDA (signer), the governance
+/// account, the proposal (writable). Argument: the hub's current epoch
+/// (u32). It must check the proposal can run now, mark it executed, and
+/// `set_return_data` the proposal's address.
+pub const CONFIRM_EXECUTION: &str = "confirm_execution";
+
+/// Anchor's 8-byte instruction discriminator for `confirm_execution`:
+/// the first 8 bytes of sha256("global:confirm_execution").
+pub const CONFIRM_EXECUTION_DISCRIMINATOR: [u8; 8] = {
+    let h = const_crypto::sha2::Sha256::new().update(b"global:confirm_execution").finalize();
+    [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7]]
+};
+
+/// The first field of every governance program's proposal account, right
+/// after Anchor's 8-byte discriminator, so the hub can read what to run
+/// from any model.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
+pub struct ProposalCore {
+    /// The hub DAO this proposal belongs to.
+    pub hub_dao: Pubkey,
+    /// The hub epoch it was made in; only runs while that epoch lasts.
+    pub epoch: u32,
+    /// What it does when it executes, signed by the treasury.
+    pub instructions: Vec<StoredInstruction>,
+}
+
+impl ProposalCore {
+    pub fn serialized_len(&self) -> usize {
+        32 + 4 + instructions_len(&self.instructions)
+    }
+
+    /// Reads the core from a proposal account's raw data.
+    pub fn read(account_data: &[u8]) -> Result<Self> {
+        require!(account_data.len() > 8, GovError::InvalidProposalAccount);
+        let mut rest = &account_data[8..];
+        ProposalCore::deserialize(&mut rest).map_err(|_| error!(GovError::InvalidProposalAccount))
+    }
+}
 
 #[error_code]
 pub enum GovError {
@@ -81,6 +134,26 @@ pub enum GovError {
     WrongDao,
     #[msg("Arithmetic overflow")]
     Overflow,
+    #[msg("Not a proposal account this hub can read")]
+    InvalidProposalAccount,
+    #[msg("This proposal was made under an earlier governance setup and can no longer run")]
+    StaleProposal,
+    #[msg("This governance program isn't the one running the DAO")]
+    NotActiveGovernance,
+    #[msg("That governance program isn't approved")]
+    ModelNotApproved,
+    #[msg("The governance program didn't confirm this proposal")]
+    NotConfirmed,
+    #[msg("A switch is already pending")]
+    SwitchPending,
+    #[msg("No switch is pending")]
+    NoSwitchPending,
+    #[msg("The switch delay hasn't passed yet")]
+    SwitchNotReady,
+    #[msg("The new governance program hasn't been set up for this DAO")]
+    GovernanceNotInitialized,
+    #[msg("Already the DAO's governance program")]
+    AlreadyActive,
 }
 
 /// A DAO's voting rules. Times are in seconds.
@@ -352,6 +425,23 @@ mod tests {
         assert!(validate_instructions(&[ix(Pubkey::new_unique())], &treasury).is_err());
         assert!(validate_instructions(&[], &treasury).is_err());
         assert!(validate_instructions(&vec![ix(treasury); MAX_INSTRUCTIONS + 1], &treasury).is_err());
+    }
+
+    #[test]
+    fn core_reads_from_account_prefix() {
+        let core = ProposalCore {
+            hub_dao: Pubkey::new_unique(),
+            epoch: 3,
+            instructions: vec![StoredInstruction { program_id: Pubkey::new_unique(), accounts: vec![], data: vec![9, 9] }],
+        };
+        let mut data = vec![1u8; 8];
+        data.extend(anchor_lang::prelude::borsh::to_vec(&core).unwrap());
+        assert_eq!(core.serialized_len(), data.len() - 8);
+        // Model-specific fields after the core don't matter.
+        data.extend([7u8; 40]);
+        assert_eq!(ProposalCore::read(&data).unwrap(), core);
+        assert!(ProposalCore::read(&[0u8; 8]).is_err());
+        assert_ne!(CONFIRM_EXECUTION_DISCRIMINATOR, [0u8; 8]);
     }
 
     #[test]

@@ -1,13 +1,13 @@
 [package]
-name = "vortex-token-weighted"
-description = "Vortexes token-weighted governance: deposit tokens, propose, vote for/against/abstain, quorum + approval, timelock, execute."
+name = "vortex-hub"
+description = "Vortexes hub: every DAO's record and treasury, the approved governance models, running passed proposals, and switching a DAO's governance."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "vortex_token_weighted"
+name = "vortex_hub"
 
 [features]
 default = []
@@ -18,13 +18,11 @@ custom-heap = []
 custom-panic = []
 anchor-debug = []
 cpi = ["no-entrypoint"]
-idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build", "vortex-core/idl-build", "vortex-hub/idl-build"]
+idl-build = ["anchor-lang/idl-build", "vortex-core/idl-build"]
 
 [dependencies]
 anchor-lang = { workspace = true, features = ["init-if-needed"] }
-anchor-spl = { workspace = true }
 vortex-core = { path = "../../crates/vortex-core" }
-vortex-hub = { path = "../hub", features = ["cpi"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

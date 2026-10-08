@@ -7,14 +7,18 @@ resolution = true
 skip-lint = false
 
 [workspace]
-members = ["programs/token-weighted"]
+members = ["programs/hub", "programs/token-weighted", "programs/quadratic"]
 
 # Placeholder IDs: run `anchor keys sync` before the first deploy.
 [programs.localnet]
+vortex_hub = "F8LBtNiwU4b7XZ2X9oNEfSghSJ7B2ZgqvZC1DtqgUewr"
 vortex_token_weighted = "HGy7TqBWCxacyVoznw4UciYdcdwpmJ7JdCoZu8XTTHQ"
+vortex_quadratic = "5zF3LgrJgKwYGVtPJuxD5NTyznuoD2nhbHhBawG5gFH7"
 
 [programs.devnet]
+vortex_hub = "F8LBtNiwU4b7XZ2X9oNEfSghSJ7B2ZgqvZC1DtqgUewr"
 vortex_token_weighted = "HGy7TqBWCxacyVoznw4UciYdcdwpmJ7JdCoZu8XTTHQ"
+vortex_quadratic = "5zF3LgrJgKwYGVtPJuxD5NTyznuoD2nhbHhBawG5gFH7"
 
 [provider]
 cluster = "localnet"
