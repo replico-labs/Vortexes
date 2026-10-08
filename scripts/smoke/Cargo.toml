@@ -1,0 +1,28 @@
+[package]
+name = "vortex-smoke"
+description = "Smoke test for a live cluster: sets up the hub, runs one paying proposal through each model, and switches a DAO between models."
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+anchor-lang = { workspace = true }
+solana-rpc-client = "3"
+solana-commitment-config = "*"
+solana-transaction = "3"
+solana-keypair = "*"
+solana-signer = "*"
+solana-instruction = "*"
+solana-sdk-ids = "*"
+solana-system-interface = { version = "*", features = ["bincode"] }
+solana-compute-budget-interface = { version = "*", features = ["borsh"] }
+spl-token-interface = "*"
+spl-associated-token-account-interface = "*"
+vortex-core = { path = "../../crates/vortex-core" }
+vortex-hub = { path = "../../programs/hub", features = ["no-entrypoint"] }
+vortex-token-weighted = { path = "../../programs/token-weighted", features = ["no-entrypoint"] }
+vortex-quadratic = { path = "../../programs/quadratic", features = ["no-entrypoint"] }
+vortex-optimistic = { path = "../../programs/optimistic", features = ["no-entrypoint"] }
+vortex-board = { path = "../../programs/board", features = ["no-entrypoint"] }
+vortex-conviction = { path = "../../programs/conviction", features = ["no-entrypoint"] }
+vortex-delegate = { path = "../../programs/delegate", features = ["no-entrypoint"] }

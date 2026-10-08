@@ -86,6 +86,8 @@ anchor build      # programs into target/deploy/, IDLs into target/idl/
 cargo test        # unit tests + end-to-end tests (needs the build above)
 ```
 
+Use `anchor build`, not a bare `cargo-build-sbf` at the root: building everything in one go builds the hub without its entry point.
+
 The end-to-end tests run the compiled programs in [LiteSVM](https://github.com/LiteSVM/litesvm) with the real SPL Token, Token-2022 and Associated Token programs. Current result: **52 end-to-end tests and 10 unit tests passed, 0 failed**. They cover every model's lifecycle, the hub's checks, switching between models with one treasury, and budgets.
 
 `idl/` holds the IDLs for clients such as the bot; copy them from `target/idl/` after changing a program. Error codes come from `GovError` in `vortex-core` and are the same in every program.
@@ -100,12 +102,19 @@ anchor build
 anchor deploy --provider.cluster devnet
 ```
 
-Then, once: call `init_hub` (the caller becomes the hub admin), and approve each model with `set_model`. Keep the program keypairs out of git (`.gitignore` already does).
+Keep the program keypairs out of git (`.gitignore` already does). Deploying all seven programs costs about 17–18 SOL in rent.
+
+Then run the smoke test. It sets up the hub (your wallet becomes the hub admin) and approves the models, then creates a DAO in each model and pushes one proposal through that pays a little SOL from its treasury. It also starts a token-weighted → board switch, which can only finish after the hub's 2-day delay. A run costs about 0.6 SOL.
+
+```bash
+cargo run -p vortex-smoke -- run --url devnet             # uses ~/.config/solana/id.json; --keypair to change
+cargo run -p vortex-smoke -- finish-switch --url devnet   # 2 days later
+```
 
 ## Known gaps
 
 - **No audit.** The hub holds every DAO's treasury. Get it audited before mainnet, and move the hub admin and every program's upgrade authority to a multisig.
-- **Never run on a live cluster.** Everything has passed in LiteSVM only; a devnet smoke test is next.
+- **Not on devnet yet.** The smoke test passes on a local validator (every model, and starting a switch); devnet is next.
 - **Not in the bot yet.** The bot runs Spaces on EVM chains only.
 - **Budgets only see listed assets,** and only in the treasury's associated token accounts.
 

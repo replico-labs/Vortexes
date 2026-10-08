@@ -4,3 +4,6 @@ test-ledger/
 # Program keypairs decide the deployed addresses: keep them out of git.
 keys/
 *-keypair.json
+
+# Smoke test state (throwaway devnet keys for finish-switch)
+scripts/smoke/.state/
