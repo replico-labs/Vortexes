@@ -7,7 +7,7 @@ resolution = true
 skip-lint = false
 
 [workspace]
-members = ["programs/hub", "programs/token-weighted", "programs/quadratic", "programs/optimistic", "programs/board", "programs/conviction", "programs/delegate"]
+members = ["programs/hub", "programs/token-weighted", "programs/quadratic", "programs/optimistic", "programs/board", "programs/conviction", "programs/delegate", "programs/liquid", "programs/sortition", "programs/sowellian", "programs/decision-markets"]
 
 # The devnet deployment's program IDs (keypairs kept off git by their deployer).
 [programs.localnet]
@@ -18,6 +18,10 @@ vortex_optimistic = "Bjcfj2p8da2mjzDzMbcpxSrqayuiDToDVZdaBPmGPpdX"
 vortex_board = "9yERBxsEw5oDDQVX2BEZP7ehpGAr3wArZoT3sbxNoXZE"
 vortex_conviction = "9sxWrySQv33tdf7WZQKW7zkDrjeq1EiphKqBgq2kxrWQ"
 vortex_delegate = "6TVZxo8LeXTsgH8iC39SD1AUeNUYJx3kGf71bEmsUvk2"
+vortex_liquid = "CMf1cxiDNmEasmM9VQwJSz5p4RVw1A5GZUjTEy95du1W"
+vortex_sortition = "FjuZX6dakUUY2GxqnHiqkpDUADBJyA3GkmoT5gqvp6U5"
+vortex_sowellian = "G99YpKvNXVQmTgvXX6XGt1z3LvbEyhhDCENwat1nsrx2"
+vortex_decision_markets = "FfUPS88Xoao8N4QTW9SGtua1XyN2q4HyBpNha7AB5t4S"
 
 [programs.devnet]
 vortex_hub = "5m9N12e9seKNxEXFBJSKr5vd9uryXpckSakfrzDWxMKe"

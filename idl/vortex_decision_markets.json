@@ -1,0 +1,1908 @@
+{
+  "address": "FfUPS88Xoao8N4QTW9SGtua1XyN2q4HyBpNha7AB5t4S",
+  "metadata": {
+    "name": "vortex_decision_markets",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Vortexes decision markets (futarchy): pass and fail markets per proposal, decided by TWAP."
+  },
+  "instructions": [
+    {
+      "name": "cancel",
+      "docs": [
+        "Cancels a proposal that hasn't run: its proposer before the markets",
+        "settle, or the DAO through a proposal. Unsettled markets settle as",
+        "failed (the fail side redeems), since it won't run."
+      ],
+      "discriminator": [
+        232,
+        219,
+        223,
+        41,
+        219,
+        236,
+        220,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "confirm_execution",
+      "docs": [
+        "The hub's check before it runs a proposal (CONFIRM_EXECUTION): passed,",
+        "after the timelock, within the execution period."
+      ],
+      "discriminator": [
+        34,
+        75,
+        247,
+        73,
+        89,
+        127,
+        101,
+        123
+      ],
+      "accounts": [
+        {
+          "name": "executor",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "epoch",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "finalize",
+      "docs": [
+        "Settles the markets once trading has ended. Anyone."
+      ],
+      "discriminator": [
+        171,
+        61,
+        218,
+        56,
+        127,
+        115,
+        12,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "init_governance",
+      "docs": [
+        "Sets up a hub DAO here: rules, the DAO's token (base), the quote",
+        "token, and a vault for each. The creator right after create_dao, or",
+        "the treasury when switching here."
+      ],
+      "discriminator": [
+        23,
+        241,
+        166,
+        67,
+        20,
+        30,
+        182,
+        32
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "hub_dao"
+        },
+        {
+          "name": "governance",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  118,
+                  101,
+                  114,
+                  110,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              }
+            ]
+          }
+        },
+        {
+          "name": "base_mint"
+        },
+        {
+          "name": "quote_mint"
+        },
+        {
+          "name": "base_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  115,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              }
+            ]
+          }
+        },
+        {
+          "name": "quote_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  117,
+                  111,
+                  116,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              }
+            ]
+          }
+        },
+        {
+          "name": "base_token_program"
+        },
+        {
+          "name": "quote_token_program"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": {
+              "name": "MarketsConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "merge",
+      "docs": [
+        "Turns pairs of pass and fail tokens back into the underlying, while trading lasts."
+      ],
+      "discriminator": [
+        148,
+        141,
+        236,
+        47,
+        174,
+        126,
+        69,
+        111
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_base",
+          "writable": true
+        },
+        {
+          "name": "owner_quote",
+          "writable": true
+        },
+        {
+          "name": "tokens",
+          "accounts": [
+            {
+              "name": "governance"
+            },
+            {
+              "name": "base_vault",
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "quote_vault",
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "base_mint",
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "quote_mint",
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "base_token_program"
+            },
+            {
+              "name": "quote_token_program"
+            }
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "base",
+          "type": "u64"
+        },
+        {
+          "name": "quote",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "propose",
+      "docs": [
+        "Proposes `instructions` and opens its markets, seeding each pool with",
+        "`base_seed` and `quote_seed` from the proposer. `id` must be",
+        "proposal_count + 1."
+      ],
+      "discriminator": [
+        93,
+        253,
+        82,
+        168,
+        118,
+        33,
+        102,
+        90
+      ],
+      "accounts": [
+        {
+          "name": "proposer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        },
+        {
+          "name": "hub_dao",
+          "relations": [
+            "governance"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "proposer_base",
+          "writable": true
+        },
+        {
+          "name": "proposer_quote",
+          "writable": true
+        },
+        {
+          "name": "tokens",
+          "accounts": [
+            {
+              "name": "governance"
+            },
+            {
+              "name": "base_vault",
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "quote_vault",
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "base_mint",
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "quote_mint",
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "base_token_program"
+            },
+            {
+              "name": "quote_token_program"
+            }
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "id",
+          "type": "u64"
+        },
+        {
+          "name": "metadata_uri",
+          "type": "string"
+        },
+        {
+          "name": "instructions",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "StoredInstruction"
+              }
+            }
+          }
+        },
+        {
+          "name": "base_seed",
+          "type": "u64"
+        },
+        {
+          "name": "quote_seed",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "reclaim_liquidity",
+      "docs": [
+        "The proposer takes what's left in the winning pool (their seed plus",
+        "fees, after trades), once it's settled."
+      ],
+      "discriminator": [
+        148,
+        114,
+        192,
+        195,
+        98,
+        5,
+        115,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "proposer",
+          "signer": true,
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        },
+        {
+          "name": "proposer_base",
+          "writable": true
+        },
+        {
+          "name": "proposer_quote",
+          "writable": true
+        },
+        {
+          "name": "tokens",
+          "accounts": [
+            {
+              "name": "governance"
+            },
+            {
+              "name": "base_vault",
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "quote_vault",
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "base_mint",
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "quote_mint",
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "base_token_program"
+            },
+            {
+              "name": "quote_token_program"
+            }
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "redeem",
+      "docs": [
+        "Pays out the caller's winning-side tokens 1:1 (the fail side if the",
+        "proposal failed or was cancelled); the other side is worthless."
+      ],
+      "discriminator": [
+        184,
+        12,
+        86,
+        149,
+        70,
+        196,
+        97,
+        225
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_base",
+          "writable": true
+        },
+        {
+          "name": "owner_quote",
+          "writable": true
+        },
+        {
+          "name": "tokens",
+          "accounts": [
+            {
+              "name": "governance"
+            },
+            {
+              "name": "base_vault",
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "quote_vault",
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "base_mint",
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "quote_mint",
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "base_token_program"
+            },
+            {
+              "name": "quote_token_program"
+            }
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "split",
+      "docs": [
+        "Deposits `base` of the DAO's token and `quote` of the quote token,",
+        "getting that much of each as both pass and fail tokens. While trading lasts."
+      ],
+      "discriminator": [
+        124,
+        189,
+        27,
+        43,
+        216,
+        40,
+        147,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_base",
+          "writable": true
+        },
+        {
+          "name": "owner_quote",
+          "writable": true
+        },
+        {
+          "name": "tokens",
+          "accounts": [
+            {
+              "name": "governance"
+            },
+            {
+              "name": "base_vault",
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "quote_vault",
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "base_mint",
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "quote_mint",
+              "relations": [
+                "governance"
+              ]
+            },
+            {
+              "name": "base_token_program"
+            },
+            {
+              "name": "quote_token_program"
+            }
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "base",
+          "type": "u64"
+        },
+        {
+          "name": "quote",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "trade",
+      "docs": [
+        "Swaps in one market: `amount_in` of its base (selling) or quote",
+        "(buying) for at least `min_out` of the other. While trading lasts."
+      ],
+      "discriminator": [
+        178,
+        144,
+        26,
+        216,
+        241,
+        187,
+        206,
+        130
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        },
+        {
+          "name": "position",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "market",
+          "type": {
+            "defined": {
+              "name": "Market"
+            }
+          }
+        },
+        {
+          "name": "side_in",
+          "type": {
+            "defined": {
+              "name": "Side"
+            }
+          }
+        },
+        {
+          "name": "amount_in",
+          "type": "u64"
+        },
+        {
+          "name": "min_out",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "update_config",
+      "docs": [
+        "Replaces the rules (only through a passed proposal)."
+      ],
+      "discriminator": [
+        29,
+        158,
+        252,
+        191,
+        10,
+        83,
+        219,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": {
+              "name": "MarketsConfig"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Governance",
+      "discriminator": [
+        18,
+        143,
+        88,
+        13,
+        73,
+        217,
+        47,
+        49
+      ]
+    },
+    {
+      "name": "Position",
+      "discriminator": [
+        170,
+        188,
+        143,
+        228,
+        122,
+        64,
+        247,
+        208
+      ]
+    },
+    {
+      "name": "Proposal",
+      "discriminator": [
+        26,
+        94,
+        189,
+        187,
+        116,
+        136,
+        53,
+        33
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "ConfigUpdated",
+      "discriminator": [
+        40,
+        241,
+        230,
+        122,
+        11,
+        19,
+        198,
+        194
+      ]
+    },
+    {
+      "name": "GovernanceInitialized",
+      "discriminator": [
+        41,
+        187,
+        103,
+        26,
+        42,
+        44,
+        30,
+        15
+      ]
+    },
+    {
+      "name": "LiquidityReclaimed",
+      "discriminator": [
+        195,
+        129,
+        58,
+        182,
+        54,
+        241,
+        96,
+        218
+      ]
+    },
+    {
+      "name": "Merged",
+      "discriminator": [
+        57,
+        129,
+        241,
+        73,
+        156,
+        41,
+        126,
+        251
+      ]
+    },
+    {
+      "name": "ProposalCancelled",
+      "discriminator": [
+        253,
+        59,
+        104,
+        46,
+        129,
+        78,
+        9,
+        14
+      ]
+    },
+    {
+      "name": "ProposalCreated",
+      "discriminator": [
+        186,
+        8,
+        160,
+        108,
+        81,
+        13,
+        51,
+        206
+      ]
+    },
+    {
+      "name": "ProposalExecuted",
+      "discriminator": [
+        92,
+        213,
+        189,
+        201,
+        101,
+        83,
+        111,
+        83
+      ]
+    },
+    {
+      "name": "ProposalFinalized",
+      "discriminator": [
+        159,
+        104,
+        210,
+        220,
+        86,
+        209,
+        61,
+        51
+      ]
+    },
+    {
+      "name": "Redeemed",
+      "discriminator": [
+        14,
+        29,
+        183,
+        71,
+        31,
+        165,
+        107,
+        38
+      ]
+    },
+    {
+      "name": "TokensSplit",
+      "discriminator": [
+        203,
+        162,
+        194,
+        220,
+        152,
+        63,
+        72,
+        37
+      ]
+    },
+    {
+      "name": "Traded",
+      "discriminator": [
+        225,
+        202,
+        73,
+        175,
+        147,
+        43,
+        160,
+        150
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "ConfigUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "MarketsConfig"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Dao",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "create_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "governance_program",
+            "docs": [
+              "The governance program running the DAO now."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "governance",
+            "docs": [
+              "The DAO's account in that program: `[GOVERNANCE_SEED, dao]` there."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "Starts at 1 and goes up with every switch. Proposals only run in",
+              "the epoch they were made in."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "pending_switch",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PendingSwitch"
+                }
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "treasury_bump",
+            "type": "u8"
+          },
+          {
+            "name": "executor_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Governance",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "executor",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_mint",
+            "docs": [
+              "The DAO's token."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "docs": [
+              "What it's priced in."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "base_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "MarketsConfig"
+              }
+            }
+          },
+          {
+            "name": "proposal_count",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GovernanceInitialized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "quote_mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LiquidityReclaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "base",
+            "type": "u64"
+          },
+          {
+            "name": "quote",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Market",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pass"
+          },
+          {
+            "name": "Fail"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketsConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "trading_period",
+            "docs": [
+              "How long both markets trade."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "threshold_bps",
+            "docs": [
+              "How far the pass TWAP must beat the fail TWAP (basis points)."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "timelock",
+            "type": "u32"
+          },
+          {
+            "name": "execution_period",
+            "type": "u32"
+          },
+          {
+            "name": "min_base_seed",
+            "docs": [
+              "Smallest seeds a proposal opens its pools with."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "min_quote_seed",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Merged",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "base",
+            "type": "u64"
+          },
+          {
+            "name": "quote",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PendingSwitch",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program",
+            "type": "pubkey"
+          },
+          {
+            "name": "ready_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Pool",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "base",
+            "type": "u64"
+          },
+          {
+            "name": "quote",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Position",
+      "docs": [
+        "A trader's pass and fail balances in one proposal's markets."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "pass_base",
+            "type": "u64"
+          },
+          {
+            "name": "pass_quote",
+            "type": "u64"
+          },
+          {
+            "name": "fail_base",
+            "type": "u64"
+          },
+          {
+            "name": "fail_quote",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Proposal",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "core",
+            "type": {
+              "defined": {
+                "name": "ProposalCore"
+              }
+            }
+          },
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          },
+          {
+            "name": "created_at",
+            "docs": [
+              "When the markets opened: the start of the TWAP window."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "trading_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "pass_pool",
+            "type": {
+              "defined": {
+                "name": "Pool"
+              }
+            }
+          },
+          {
+            "name": "fail_pool",
+            "type": {
+              "defined": {
+                "name": "Pool"
+              }
+            }
+          },
+          {
+            "name": "last_update",
+            "type": "i64"
+          },
+          {
+            "name": "pass_cumulative",
+            "docs": [
+              "Sum of price × seconds (u128)."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "fail_cumulative",
+            "type": "u128"
+          },
+          {
+            "name": "base_collateral",
+            "docs": [
+              "Underlying held for this proposal's markets."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "quote_collateral",
+            "type": "u64"
+          },
+          {
+            "name": "finalized",
+            "type": "bool"
+          },
+          {
+            "name": "passed",
+            "type": "bool"
+          },
+          {
+            "name": "pass_twap",
+            "type": "u128"
+          },
+          {
+            "name": "fail_twap",
+            "type": "u128"
+          },
+          {
+            "name": "queued_at",
+            "type": "i64"
+          },
+          {
+            "name": "executed",
+            "type": "bool"
+          },
+          {
+            "name": "cancelled",
+            "type": "bool"
+          },
+          {
+            "name": "liquidity_reclaimed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "by",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalCore",
+      "docs": [
+        "The first field of every governance program's proposal account, right",
+        "after Anchor's 8-byte discriminator, so the hub can read what to run",
+        "from any model."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "docs": [
+              "The hub DAO this proposal belongs to."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "The hub epoch it was made in; only runs while that epoch lasts."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "instructions",
+            "docs": [
+              "What it does when it executes, signed by the treasury."
+            ],
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "StoredInstruction"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "proposer",
+            "type": "pubkey"
+          },
+          {
+            "name": "metadata_uri",
+            "type": "string"
+          },
+          {
+            "name": "base_seed",
+            "type": "u64"
+          },
+          {
+            "name": "quote_seed",
+            "type": "u64"
+          },
+          {
+            "name": "trading_deadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalExecuted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProposalFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "passed",
+            "type": "bool"
+          },
+          {
+            "name": "pass_twap",
+            "type": "u128"
+          },
+          {
+            "name": "fail_twap",
+            "type": "u128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Redeemed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "base",
+            "type": "u64"
+          },
+          {
+            "name": "quote",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Side",
+      "docs": [
+        "What goes into a trade: the market's base token (selling it) or its quote token (buying base)."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Base"
+          },
+          {
+            "name": "Quote"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StoredAccountMeta",
+      "docs": [
+        "One account an instruction touches."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pubkey",
+            "type": "pubkey"
+          },
+          {
+            "name": "is_signer",
+            "type": "bool"
+          },
+          {
+            "name": "is_writable",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "StoredInstruction",
+      "docs": [
+        "One instruction a proposal runs when it executes."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "accounts",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "StoredAccountMeta"
+                }
+              }
+            }
+          },
+          {
+            "name": "data",
+            "type": "bytes"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TokensSplit",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "base",
+            "type": "u64"
+          },
+          {
+            "name": "quote",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Traded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "trader",
+            "type": "pubkey"
+          },
+          {
+            "name": "market",
+            "type": {
+              "defined": {
+                "name": "Market"
+              }
+            }
+          },
+          {
+            "name": "side_in",
+            "type": {
+              "defined": {
+                "name": "Side"
+              }
+            }
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "amount_out",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

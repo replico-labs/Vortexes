@@ -40,8 +40,12 @@ On the EVM, every DAO gets its own `Treasury` contract, and switching models is 
 | **Board (Multisig)** | M-of-N signers confirm; no token at all |
 | **Conviction** | Members back one proposal at a time; support builds conviction over time, with per-asset spending budgets |
 | **Delegate** | Members elect a council for a term; the council proposes and votes; members can recall council members |
+| **Liquid** | Token-weighted, but members can delegate their votes (one hop) and still override their delegate on any proposal |
+| **Sortition** | The council is drawn at random (ORAO VRF) from members who opted in; the council proposes and votes |
+| **Sowellian** | Proposals state success criteria; members approve them; a YES/NO market backs predictions; the outcome is resolved by a Pyth price or a challengeable human resolver |
+| **Decision Markets** | Futarchy: each proposal opens a pass market and a fail market; the higher time-weighted price decides, no votes |
 
-Sortition, Liquid, Sowellian and Decision Markets are not ported yet.
+All ten Spaces models are now ported.
 
 ## Programs
 
@@ -54,6 +58,10 @@ Sortition, Liquid, Sowellian and Decision Markets are not ported yet.
 | `programs/board` | Signers, confirmations |
 | `programs/conviction` | Conviction, the asset list and spending budgets |
 | `programs/delegate` | Elections, council votes, recalls |
+| `programs/liquid` | Token voting with delegation: running totals, overrides, one hop |
+| `programs/sortition` | The draw pool, ORAO-randomness draws, council votes |
+| `programs/sowellian` | Approval votes, the YES/NO market, oracle and human resolution, adjudication, bonds |
+| `programs/decision-markets` | Conditional balances, the pass and fail pools, TWAP settlement, redemption |
 | `crates/vortex-core` | Shared library: seeds, the proposal prefix every model uses, vote math, errors (not deployed) |
 
 Each program's header comment explains its rules in full.
@@ -71,6 +79,53 @@ Each program's header comment explains its rules in full.
   - Delegate: a recalled member's votes stop counting, and a new council ends the old one's proposals.
   - Optimistic: a challenger gets their bond back if the proposal is cancelled.
 
+## Liquid delegation
+
+The EVM version adds each delegator's weight after their delegate votes, one transaction per delegator from a keeper, and follows delegation chains. On Solana a chain can't be walked inside one transaction, so `vortex-liquid` works differently:
+
+- **Running totals.** Delegating adds the member's deposit to their delegate's `delegated_power`; deposits, withdrawals and undelegating keep it in step. A delegate's vote counts their own deposit plus that total at once, with no keeper.
+- **Overrides.** A delegator votes themselves with `override_vote`.
+  - If the delegate already voted with their tokens, the weight moves from the delegate's choice to theirs.
+  - If not, it's recorded against that proposal, and the delegate's later vote leaves it out. That record's address is fixed by the proposal and the delegate, so a delegate can't leave it out of the vote.
+- **One hop.** A delegate can't delegate, and nobody can delegate to someone who has.
+- **No double counting without snapshots.**
+  - A global counter (`seq`) orders delegations and votes, so a vote includes a delegator's tokens exactly when it came after the delegation.
+  - While a vote that counted a delegator's tokens is open, that delegator can't withdraw, add tokens or undelegate. They can always override.
+  - A member can't delegate while a vote of their own is open.
+
+## Sortition randomness
+
+Pyth Entropy, which the EVM version uses, isn't on Solana. `vortex-sortition` uses [ORAO VRF](https://github.com/orao-network/solana-vrf) (`VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y`, the same address on devnet and mainnet) without calling it:
+- **Starting a draw.** The draw's transaction first asks ORAO for randomness, with the seed `sha256("vortex-sortition", governance, draw number, nonce)`, then calls `start_draw`. That checks the request is ORAO's account at that seed's address and still unanswered, then freezes the pool. Nobody can join or leave the pool knowing the result.
+- **Finalizing.** Once ORAO answers, `finalize_draw` reads the 64 random bytes and seats the council with a partial Fisher-Yates shuffle.
+- **Stuck draws.** If ORAO doesn't answer within `randomness_timeout`, the draw can be started again with a new request. That's allowed only while the old request is still unanswered, so a result can't be seen and then thrown away.
+- **No dependency on ORAO's code.** Because the program never calls ORAO, it doesn't depend on ORAO's Anchor version. The tests write ORAO's request accounts directly in the layout from `orao-solana-vrf` 0.7.0.
+- **Small pools.** If the pool is smaller than the council, everyone in it is seated, and the quorum is capped at the council's size.
+
+## Sowellian resolution
+
+The flow is the EVM version's: propose with a bond and criteria, approval vote, YES/NO positions, execution through the hub, a measurement period, then resolution. On Solana:
+- **Oracle track: Pyth.** The proposal names a Pyth feed id and an 18-decimal target. Resolving takes a `PriceUpdateV2` account, and the program refuses it unless:
+  - it's owned by the Pyth Receiver (`rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ`);
+  - it's fully verified (all Wormhole guardian signatures checked);
+  - it's for that feed;
+  - it was published after the measurement period ended, a check the EVM version doesn't make;
+  - it's no older than `max_oracle_staleness`.
+- **Votes use deposits.** Approval and adjudication votes count deposited tokens, locked until those votes close. Positions and bonds come from wallets, so betting never reduces anyone's vote; the EVM version needs a pre-market snapshot to get the same effect.
+- **Bonds are claimed, not pushed.** Each owner claims their own bond (`claim_bond`), and forfeits are swept to the treasury (`sweep_to_treasury`). Nobody's missing token account can block a resolution.
+- **Expiry.** An approved proposal that nobody runs within `execution_period` can be voided: stakes are refunded and the bond returned.
+
+## Decision markets
+
+Same rules as the EVM version: a proposal's pass and fail markets trade for `trading_period`, and it passes if the pass TWAP beats the fail TWAP by more than `threshold_bps`. Built for Solana:
+- **Conditional tokens are a ledger.** The EVM version deploys four ERC20s and two pair contracts per proposal. Here each proposal keeps everyone's pass and fail balances (`split` and `merge` move the DAO's token or the quote token in and out), and keeps both pools' reserves.
+- **The quote token is set per DAO**, e.g. wrapped SOL or USDC, in place of WMON.
+- **One step to open.** Proposing seeds both pools from the proposer and starts trading at once; there's no 2M-gas limit to split around.
+- **Settlement.** The winning side redeems 1:1 and the losing side is worthless. The proposer reclaims the winning pool, which is their seed plus fees after trades.
+- **Cancelling** settles as failed, because the proposal won't run.
+- **Collateral is tracked per proposal.** Every payout comes out of that, so a market can never draw on another proposal's funds. The tests check that the vaults end at exactly zero.
+- **TWAP.** It's price × seconds over the whole window, the EVM pair's method. A one-second spike at the end moves it by about 1%, which the tests also check.
+
 ## Conviction spending budgets
 
 As in Spaces' version 2: the DAO keeps a list of up to 10 assets it protects (SOL and its own token from the start), each with a weight. Every proposal declares a budget per asset, and its bar rises by `weight × amount ÷ the treasury's holding`. Proposals that loosen the rules, switch model or hand over an authority need the bar of spending everything.
@@ -86,7 +141,7 @@ anchor build      # programs into target/deploy/, IDLs into target/idl/
 cargo test        # unit tests + end-to-end tests (needs the build above)
 ```
 
-The end-to-end tests run the compiled programs in [LiteSVM](https://github.com/LiteSVM/litesvm) with the real SPL Token, Token-2022 and Associated Token programs. Current result: **52 end-to-end tests and 10 unit tests passed, 0 failed**. They cover every model's lifecycle, the hub's checks, switching between models with one treasury, and budgets.
+The end-to-end tests run the compiled programs in [LiteSVM](https://github.com/LiteSVM/litesvm) with the real SPL Token, Token-2022 and Associated Token programs. Current result: **76 end-to-end tests and 10 unit tests passed, 0 failed**. They cover every model's lifecycle, the hub's checks, switching between models with one treasury, and budgets.
 
 `idl/` holds the IDLs for clients such as the bot; copy them from `target/idl/` after changing a program. Error codes come from `GovError` in `vortex-core` and are the same in every program.
 
@@ -100,7 +155,7 @@ anchor build
 anchor deploy --provider.cluster devnet
 ```
 
-Keep the program keypairs out of git (`.gitignore` already does): whoever holds them controls those addresses. Deploying all seven programs costs about 17–18 SOL in rent.
+Keep the program keypairs out of git (`.gitignore` already does): whoever holds them controls those addresses. Deploying all eleven programs costs about 29 SOL in rent.
 
 Then run the smoke test. It sets up the hub (your wallet becomes the hub admin) and approves the models, then creates a DAO in each model and pushes one proposal through that pays a little SOL from its treasury. It also starts a token-weighted → board switch, which can only finish after the hub's 2-day delay. A run costs about 0.6 SOL.
 
@@ -121,7 +176,7 @@ cargo run -p vortex-smoke -- finish-switch --url devnet   # 2 days later
 | `vortex-conviction` | `9sxWrySQv33tdf7WZQKW7zkDrjeq1EiphKqBgq2kxrWQ` |
 | `vortex-delegate` | `6TVZxo8LeXTsgH8iC39SD1AUeNUYJx3kGf71bEmsUvk2` |
 
-The hub is set up and all six models are approved. The smoke test passed on devnet for every model, and its token-weighted → board switch is waiting out the 2-day delay.
+The hub is set up and the six models above are approved. `vortex-liquid` (`CMf1cxiDNmEasmM9VQwJSz5p4RVw1A5GZUjTEy95du1W`), `vortex-sortition` (`FjuZX6dakUUY2GxqnHiqkpDUADBJyA3GkmoT5gqvp6U5`) `vortex-sowellian` (`G99YpKvNXVQmTgvXX6XGt1z3LvbEyhhDCENwat1nsrx2`) and `vortex-decision-markets` (`FfUPS88Xoao8N4QTW9SGtua1XyN2q4HyBpNha7AB5t4S`) aren't deployed yet: deploy each with `anchor deploy -p <name>`, then approve it with the hub's `set_model`. Those addresses come from program keypairs that aren't in git. Deploying from your own keypairs gives new addresses: run `anchor keys sync`, rebuild, deploy, copy the IDLs, and point the bot at them with `SOLANA_DEVNET_<MODEL>_PROGRAM_ID`. The smoke test passed on devnet for every model, and its token-weighted → board switch is waiting out the 2-day delay.
 
 ### Mainnet — not yet deployed
 
@@ -129,7 +184,7 @@ The hub is set up and all six models are approved. The smoke test passed on devn
 
 - **No audit.** The hub holds every DAO's treasury. Get it audited before mainnet, and move the hub admin and every program's upgrade authority to a multisig.
 - **Devnet only.** Every model has run a real proposal on devnet; switching has run in the tests but not yet finished on devnet.
-- **Not in the bot yet.** The bot runs Spaces on EVM chains only.
+- **The bot** ([protean-bot](https://github.com/replico-labs/protean-bot)) runs all ten models from its IDLs; its end-to-end tests run them on a local validator (the four newer models with ORAO's program and a Pyth price account loaded), not yet on devnet.
 - **Budgets only see listed assets,** and only in the treasury's associated token accounts.
 
 ## License

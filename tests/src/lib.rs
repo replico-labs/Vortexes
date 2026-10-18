@@ -32,6 +32,10 @@ pub const OPT: Pubkey = vortex_optimistic::ID;
 pub const BOARD: Pubkey = vortex_board::ID;
 pub const CONV: Pubkey = vortex_conviction::ID;
 pub const DEL: Pubkey = vortex_delegate::ID;
+pub const LIQ: Pubkey = vortex_liquid::ID;
+pub const SORT: Pubkey = vortex_sortition::ID;
+pub const SOW: Pubkey = vortex_sowellian::ID;
+pub const DM: Pubkey = vortex_decision_markets::ID;
 pub const SYSTEM: Pubkey = anchor_lang::system_program::ID;
 
 pub fn config() -> VotingConfig {
@@ -75,7 +79,7 @@ impl Env {
         env
     }
 
-    /// The hub with all six models approved, a token mint, and no DAO yet.
+    /// The hub with every model approved, a token mint, and no DAO yet.
     pub fn bare(token_program: Pubkey) -> Self {
         let mut svm = LiteSVM::new();
         for (id, name) in [
@@ -86,6 +90,10 @@ impl Env {
             (BOARD, "vortex_board"),
             (CONV, "vortex_conviction"),
             (DEL, "vortex_delegate"),
+            (LIQ, "vortex_liquid"),
+            (SORT, "vortex_sortition"),
+            (SOW, "vortex_sowellian"),
+            (DM, "vortex_decision_markets"),
         ] {
             if let Err(e) = svm.add_program_from_file(id, format!("{DIR}{name}.so")) {
                 panic!(
@@ -119,6 +127,10 @@ impl Env {
                 env.ix_set_model(BOARD, "board", true),
                 env.ix_set_model(CONV, "conviction", true),
                 env.ix_set_model(DEL, "delegate", true),
+                env.ix_set_model(LIQ, "liquid", true),
+                env.ix_set_model(SORT, "sortition", true),
+                env.ix_set_model(SOW, "sowellian", true),
+                env.ix_set_model(DM, "decision-markets", true),
             ],
             &[&admin_kp],
         )

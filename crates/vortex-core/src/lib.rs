@@ -238,6 +238,72 @@ pub enum GovError {
     BudgetStepOutOfOrder,
     #[msg("SOL can't be removed from the asset list")]
     CantRemoveSol,
+    // Liquid delegation
+    #[msg("You've already delegated: undelegate first")]
+    AlreadyDelegated,
+    #[msg("You haven't delegated")]
+    NotDelegated,
+    #[msg("You can't delegate to yourself")]
+    SelfDelegation,
+    #[msg("That member has delegated their own votes, so they can't take delegations")]
+    DelegateHasDelegated,
+    #[msg("Members others delegate to can't delegate themselves")]
+    HasDelegators,
+    #[msg("Your delegate has voted with your tokens on a proposal that's still open")]
+    DelegationLocked,
+    #[msg("That isn't your delegate's account")]
+    WrongDelegate,
+    // Sortition
+    #[msg("Already in the draw pool")]
+    AlreadyEligible,
+    #[msg("Not in the draw pool")]
+    NotEligible,
+    #[msg("The draw pool is full")]
+    PoolFull,
+    #[msg("Nobody is in the draw pool")]
+    PoolEmpty,
+    #[msg("A draw is under way: the pool is frozen until it's finalized")]
+    DrawInProgress,
+    #[msg("No draw is under way")]
+    NoDrawInProgress,
+    #[msg("The randomness hasn't arrived yet")]
+    RandomnessNotReady,
+    #[msg("That isn't this draw's randomness account")]
+    WrongRandomnessAccount,
+    #[msg("The randomness has already arrived: finalize the draw instead")]
+    RandomnessAlreadyFulfilled,
+    #[msg("Leave the draw pool before withdrawing")]
+    LeavePoolFirst,
+    // Sowellian
+    #[msg("The proposal isn't in the right phase for that")]
+    WrongPhase,
+    #[msg("The positions window has closed")]
+    PositionsClosed,
+    #[msg("This proposal resolves another way")]
+    WrongResolutionMethod,
+    #[msg("The measurement period isn't over yet")]
+    MeasurementNotOver,
+    #[msg("That isn't a fully verified Pyth price for this proposal's feed")]
+    WrongOracleAccount,
+    #[msg("The price is too old, or from before the measurement period ended")]
+    StaleOracleData,
+    #[msg("Nothing to claim")]
+    NothingToClaim,
+    #[msg("Already claimed")]
+    AlreadyClaimed,
+    // Decision markets
+    #[msg("Trading has closed")]
+    TradingClosed,
+    #[msg("Trading is still open")]
+    TradingOpen,
+    #[msg("Not finalized yet")]
+    NotFinalized,
+    #[msg("The trade would give less than your minimum")]
+    SlippageExceeded,
+    #[msg("Not enough of that conditional token")]
+    InsufficientConditionalBalance,
+    #[msg("The proposal didn't pass")]
+    ProposalDidNotPass,
 }
 
 /// A DAO's voting rules. Times are in seconds.

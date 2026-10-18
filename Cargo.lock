@@ -2464,6 +2464,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
+name = "orao-stub"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "solana-sha256-hasher",
+]
+
+[[package]]
 name = "pairing"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5959,6 +5967,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-decision-markets"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "vortex-core",
+ "vortex-hub",
+]
+
+[[package]]
 name = "vortex-delegate"
 version = "0.1.0"
 dependencies = [
@@ -5974,6 +5992,16 @@ version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "vortex-core",
+]
+
+[[package]]
+name = "vortex-liquid"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "vortex-core",
+ "vortex-hub",
 ]
 
 [[package]]
@@ -6023,17 +6051,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-sortition"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "solana-sha256-hasher",
+ "vortex-core",
+ "vortex-hub",
+]
+
+[[package]]
+name = "vortex-sowellian"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "vortex-core",
+ "vortex-hub",
+]
+
+[[package]]
 name = "vortex-tests"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
  "litesvm",
  "litesvm-token",
+ "solana-account 4.7.0",
  "solana-clock 4.0.0",
  "solana-instruction 4.0.0",
  "solana-instruction-error",
  "solana-keypair",
  "solana-message 4.6.0",
+ "solana-sha256-hasher",
  "solana-signer",
  "solana-system-interface 3.3.0",
  "solana-transaction 4.3.0",
@@ -6043,10 +6094,14 @@ dependencies = [
  "vortex-board",
  "vortex-conviction",
  "vortex-core",
+ "vortex-decision-markets",
  "vortex-delegate",
  "vortex-hub",
+ "vortex-liquid",
  "vortex-optimistic",
  "vortex-quadratic",
+ "vortex-sortition",
+ "vortex-sowellian",
  "vortex-token-weighted",
 ]
 

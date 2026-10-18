@@ -28,3 +28,9 @@ vortex-optimistic = { path = "../programs/optimistic", features = ["no-entrypoin
 vortex-board = { path = "../programs/board", features = ["no-entrypoint"] }
 vortex-conviction = { path = "../programs/conviction", features = ["no-entrypoint"] }
 vortex-delegate = { path = "../programs/delegate", features = ["no-entrypoint"] }
+vortex-liquid = { path = "../programs/liquid", features = ["no-entrypoint"] }
+vortex-sortition = { path = "../programs/sortition", features = ["no-entrypoint"] }
+vortex-sowellian = { path = "../programs/sowellian", features = ["no-entrypoint"] }
+vortex-decision-markets = { path = "../programs/decision-markets", features = ["no-entrypoint"] }
+solana-account = "4.3.0"
+solana-sha256-hasher = "3.1.0"
