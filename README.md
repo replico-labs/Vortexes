@@ -2,7 +2,7 @@
 
 The SVM implementation of [DAO Spaces](https://github.com/replico-labs/Spaces): on-chain DAO governance on Solana where a DAO's treasury and its governance rules are separate, so a DAO can change how it decides by vote, without its treasury moving.
 
-Built with Anchor 1.2.1 on Agave 4.3. All eleven programs are deployed on devnet; not on mainnet. The companion bot lives in [`protean-bot`](https://github.com/replico-labs/protean-bot).
+Built with Anchor 1.2.1 on Agave 4.3. All eleven programs are deployed on devnet, where every model has passed the smoke test; not on mainnet. The companion bot lives in [`protean-bot`](https://github.com/replico-labs/protean-bot).
 
 ## Why it's built differently from Spaces
 
@@ -203,7 +203,7 @@ External programs the models read (not ours; the same addresses on devnet and ma
 | Pyth Solana Receiver | `rec5EKMGg6MxZYaMdyBfgwp4d5rB9T1VQH5pJv5LtFJ` | `vortex-sowellian`: owns the `PriceUpdateV2` accounts it resolves with |
 | Pyth Push Oracle | `pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT` | Derives the sponsored price account addresses (`[shard u16 LE, feed id]`; shard 0) |
 
-The hub is set up. The six original models are approved, and the smoke test passed on devnet for each; its token-weighted → board switch is waiting out the 2-day delay. Liquid, sortition, Sowellian and decision markets are deployed but **not yet approved in the hub**, so no DAO can use them until the hub admin runs `set_model` for each, and they haven't run a proposal on devnet yet.
+The hub is set up and all ten models are approved. The smoke test passed on devnet for every model, including ORAO VRF randomness for a sortition draw (answered in about 2 seconds, fee 0.0003 SOL) and a Sowellian proposal resolved from Pyth's sponsored SOL/USD price account. Its token-weighted → board switch finished after the 2-day delay: the DAO now runs on board with the same treasury, and the board has paid from it.
 
 These addresses come from program keypairs that aren't in git. Deploying from your own keypairs gives new addresses: run `anchor keys sync`, rebuild, deploy, copy the IDLs, and point the bot at them with `SOLANA_DEVNET_<MODEL>_PROGRAM_ID`.
 
@@ -212,7 +212,7 @@ These addresses come from program keypairs that aren't in git. Deploying from yo
 ## Known gaps
 
 - **No audit.** The hub holds every DAO's treasury. Get it audited before mainnet, and move the hub admin and every program's upgrade authority to a multisig.
-- **Devnet only.** The six original models have run a real proposal on devnet; the four newer ones are deployed but not yet approved or run there. Switching has run in the tests but not yet finished on devnet.
+- **Devnet only.** Every model has run a real proposal on devnet, and a DAO has switched models there (token-weighted → board) keeping its treasury.
 - **The bot** ([protean-bot](https://github.com/replico-labs/protean-bot)) runs all ten models from its IDLs; its end-to-end tests run them on a local validator (the four newer models with ORAO's program and a Pyth price account loaded), not yet on devnet.
 - **Budgets only see listed assets,** and only in the treasury's associated token accounts.
 
