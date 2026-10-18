@@ -6043,10 +6043,14 @@ dependencies = [
  "vortex-board",
  "vortex-conviction",
  "vortex-core",
+ "vortex-decision-markets",
  "vortex-delegate",
  "vortex-hub",
+ "vortex-liquid",
  "vortex-optimistic",
  "vortex-quadratic",
+ "vortex-sortition",
+ "vortex-sowellian",
  "vortex-token-weighted",
 ]
 

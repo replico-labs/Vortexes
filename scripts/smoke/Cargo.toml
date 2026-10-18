@@ -1,6 +1,6 @@
 [package]
 name = "vortex-smoke"
-description = "Smoke test for a live cluster: sets up the hub, runs one paying proposal through each model, and switches a DAO between models."
+description = "Smoke test for a live cluster: sets up the hub, runs one paying proposal through each of the ten models, and switches a DAO between models."
 version.workspace = true
 edition.workspace = true
 publish = false
@@ -26,3 +26,7 @@ vortex-optimistic = { path = "../../programs/optimistic", features = ["no-entryp
 vortex-board = { path = "../../programs/board", features = ["no-entrypoint"] }
 vortex-conviction = { path = "../../programs/conviction", features = ["no-entrypoint"] }
 vortex-delegate = { path = "../../programs/delegate", features = ["no-entrypoint"] }
+vortex-liquid = { path = "../../programs/liquid", features = ["no-entrypoint"] }
+vortex-sortition = { path = "../../programs/sortition", features = ["no-entrypoint"] }
+vortex-sowellian = { path = "../../programs/sowellian", features = ["no-entrypoint"] }
+vortex-decision-markets = { path = "../../programs/decision-markets", features = ["no-entrypoint"] }

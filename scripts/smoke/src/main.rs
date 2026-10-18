@@ -9,14 +9,26 @@
 //! `finish-switch`: once the delay has passed, applies that switch and has
 //! the board pay from the same treasury.
 //!
+//! `approve`: only sets up the hub and approves every deployed model.
+//!
 //! ```text
-//! cargo run -p vortex-smoke -- run [--url devnet] [--keypair ~/.config/solana/id.json]
+//! cargo run -p vortex-smoke -- run [--url devnet] [--keypair ~/.config/solana/id.json] [--only liquid,sortition]
 //! cargo run -p vortex-smoke -- finish-switch [--url devnet]
+//! cargo run -p vortex-smoke -- approve [--url devnet]
 //! ```
 //!
-//! The wallet pays for everything (about 0.6 SOL in all, mostly rent) and
-//! becomes the hub admin if the hub isn't set up yet. Program IDs come from
-//! the programs' source, so build after `anchor keys sync`.
+//! Sortition draws with ORAO VRF and Sowellian's oracle track reads Pyth's
+//! sponsored SOL/USD price account, both live on devnet. On a local
+//! validator, load `scripts/orao-stub` at ORAO's address (this wallet then
+//! answers the randomness requests) and a SOL/USD price account; without
+//! the price account the oracle track is left out.
+//!
+//! The wallet pays for everything (about 1 SOL in all, mostly rent) and
+//! becomes the hub admin if the hub isn't set up yet. Approving a model
+//! needs the hub admin. Program IDs come from the programs' source, so
+//! build after `anchor keys sync`.
+
+mod newer;
 
 use anchor_lang::{prelude::Pubkey, AccountDeserialize, InstructionData, ToAccountMetas};
 use solana_commitment_config::CommitmentConfig;
@@ -42,13 +54,21 @@ const OPT: Pubkey = vortex_optimistic::ID;
 const BOARD: Pubkey = vortex_board::ID;
 const CONV: Pubkey = vortex_conviction::ID;
 const DEL: Pubkey = vortex_delegate::ID;
-const MODELS: [(Pubkey, &str); 6] = [
+const LIQ: Pubkey = vortex_liquid::ID;
+const SORT: Pubkey = vortex_sortition::ID;
+const SOW: Pubkey = vortex_sowellian::ID;
+const DM: Pubkey = vortex_decision_markets::ID;
+const MODELS: [(Pubkey, &str); 10] = [
     (TW, "token-weighted"),
     (QV, "quadratic"),
     (OPT, "optimistic"),
     (BOARD, "board"),
     (CONV, "conviction"),
     (DEL, "delegate"),
+    (LIQ, "liquid"),
+    (SORT, "sortition"),
+    (SOW, "sowellian"),
+    (DM, "decision-markets"),
 ];
 
 fn main() {
@@ -63,14 +83,22 @@ fn main() {
         PathBuf::from(std::env::var("HOME").expect("HOME")).join(".config/solana/id.json")
     });
     let payer = read_keypair_file(&keypair_path).unwrap_or_else(|e| panic!("couldn't read {}: {e}", keypair_path.display()));
-    let mut s = Smoke { rpc: RpcClient::new_with_commitment(url.clone(), CommitmentConfig::confirmed()), payer, url, results: vec![] };
+    let only: Option<Vec<String>> = flag("--only").map(|l| l.split(',').map(|m| m.trim().to_string()).collect());
+    if let Some(names) = &only {
+        if let Some(bad) = names.iter().find(|n| !MODELS.iter().any(|(_, m)| m == n)) {
+            eprintln!("--only: no model called {bad:?}; the models are {}", MODELS.map(|(_, m)| m).join(", "));
+            std::process::exit(2);
+        }
+    }
+    let mut s = Smoke { rpc: RpcClient::new_with_commitment(url.clone(), CommitmentConfig::confirmed()), payer, url, results: vec![], only };
     println!("cluster: {}\nwallet:  {} ({:.3} SOL)\n", s.url, s.payer.pubkey(), s.balance(&s.payer.pubkey()) as f64 / SOL as f64);
 
     match args.first().map(String::as_str) {
         Some("run") => s.run(),
         Some("finish-switch") => s.finish_switch(),
+        Some("approve") => s.approve(),
         _ => {
-            eprintln!("usage: vortex-smoke <run|finish-switch> [--url devnet|localhost|URL] [--keypair PATH]");
+            eprintln!("usage: vortex-smoke <run|finish-switch|approve> [--url devnet|localhost|URL] [--keypair PATH] [--only MODEL,...]");
             std::process::exit(2);
         }
     }
@@ -112,6 +140,8 @@ struct Smoke {
     payer: Keypair,
     url: String,
     results: Vec<(String, Result<(), String>)>,
+    /// `--only`: the models to run (all of them when unset).
+    only: Option<Vec<String>>,
 }
 
 impl Smoke {
@@ -120,11 +150,9 @@ impl Smoke {
     // ---------------------------------------------------------------
 
     fn run(&mut self) {
-        let deployed: Vec<(Pubkey, &str)> = MODELS.iter().copied().filter(|(id, name)| self.check_deployed(id, name)).collect();
-        if !self.check_deployed(&hub::ID, "hub") {
-            panic!("the hub isn't deployed on this cluster");
-        }
+        let deployed = self.deployed_models();
         self.setup_hub(&deployed);
+        let deployed: Vec<(Pubkey, &str)> = deployed.into_iter().filter(|(_, name)| self.only.as_ref().is_none_or(|o| o.iter().any(|n| n == name))).collect();
 
         // A token and two members, Alice and Bob, holding 1000 each.
         let mint = self.create_mint();
@@ -142,16 +170,33 @@ impl Smoke {
                 g if g == BOARD => self.board_flow(mint, &alice, &bob),
                 g if g == CONV => self.conviction_flow(mint, &alice),
                 g if g == DEL => self.delegate_flow(mint, &alice, &bob),
+                g if g == LIQ => self.liquid_flow(mint, &alice, &bob),
+                g if g == SORT => self.sortition_flow(mint, &alice, &bob),
+                g if g == SOW => self.sowellian_flow(mint, &alice, &bob),
+                g if g == DM => self.decision_markets_flow(mint, &alice, &bob),
                 _ => unreachable!(),
             };
             self.record(name, result);
         }
-        if self.results.iter().any(|(n, r)| n == "token-weighted" && r.is_ok()) && self.is_deployed(&BOARD) {
+        if self.results.iter().any(|(n, r)| n == "token-weighted" && r.is_ok()) && self.is_deployed(&BOARD) && self.only.is_none() {
             println!("== switch: token-weighted -> board");
             self.mint_to(mint, &[&alice, &bob]);
             let result = self.start_switch(mint, &alice, &bob);
             self.record("switch (started)", result);
         }
+    }
+
+    fn approve(&mut self) {
+        let deployed = self.deployed_models();
+        self.setup_hub(&deployed);
+    }
+
+    /// The models deployed on this cluster; panics if the hub isn't.
+    fn deployed_models(&self) -> Vec<(Pubkey, &'static str)> {
+        if !self.check_deployed(&hub::ID, "hub") {
+            panic!("the hub isn't deployed on this cluster");
+        }
+        MODELS.iter().copied().filter(|(id, name)| self.check_deployed(id, name)).collect()
     }
 
     fn check_deployed(&self, id: &Pubkey, name: &str) -> bool {
@@ -675,12 +720,19 @@ impl Smoke {
         Member { kp, ata }
     }
 
-    /// 1000 more tokens for each member.
+    /// 1000 more tokens for each member, and SOL back up to MEMBER_FUNDING
+    /// (each model's accounts cost them rent).
     fn mint_to(&mut self, mint: Pubkey, members: &[&Member]) {
-        let ixs: Vec<Instruction> = members
+        let mut ixs: Vec<Instruction> = members
             .iter()
             .map(|m| spl_token_interface::instruction::mint_to(&spl_token_interface::ID, &mint, &m.ata, &self.payer.pubkey(), &[], 1_000).unwrap())
             .collect();
+        for m in members {
+            let short = MEMBER_FUNDING.saturating_sub(self.balance(&m.kp.pubkey()));
+            if short > 0 {
+                ixs.push(solana_system_interface::instruction::transfer(&self.payer.pubkey(), &m.kp.pubkey(), short));
+            }
+        }
         self.send(&ixs, &[]).expect("mint to members");
     }
 
