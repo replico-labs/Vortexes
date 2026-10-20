@@ -31,7 +31,7 @@ use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::set_return_data;
 use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 use vortex_core::{validate_instructions, validate_uri, GovError, ProposalCore, StoredInstruction, GOVERNANCE_SEED};
-use vortex_hub::Dao as HubDao;
+use vortex_hub::{Dao as HubDao, DaoToken};
 
 declare_id!("FfUPS88Xoao8N4QTW9SGtua1XyN2q4HyBpNha7AB5t4S");
 
@@ -518,6 +518,15 @@ pub struct InitGovernance<'info> {
     #[account(init, payer = payer, space = 8 + Governance::INIT_SPACE, seeds = [GOVERNANCE_SEED, hub_dao.key().as_ref()], bump)]
     pub governance: Box<Account<'info, Governance>>,
     pub base_mint: Box<InterfaceAccount<'info, Mint>>,
+    /// The DAO's token on record at the hub (set_dao_token): setting up -
+    /// a switch included - only works with that mint.
+    #[account(
+        seeds = [vortex_hub::TOKEN_SEED, hub_dao.key().as_ref()],
+        bump = dao_token.bump,
+        seeds::program = vortex_hub::ID,
+        constraint = dao_token.mint == base_mint.key() @ GovError::WrongMint,
+    )]
+    pub dao_token: Box<Account<'info, DaoToken>>,
     pub quote_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(
         init, payer = payer, seeds = [BASE_VAULT_SEED, governance.key().as_ref()], bump,

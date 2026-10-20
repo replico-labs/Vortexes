@@ -304,6 +304,9 @@ pub enum GovError {
     InsufficientConditionalBalance,
     #[msg("The proposal didn't pass")]
     ProposalDidNotPass,
+    // Hub token record
+    #[msg("That isn't the DAO's token: change it with the hub's set_dao_token first")]
+    WrongMint,
 }
 
 /// A DAO's voting rules. Times are in seconds.

@@ -36,7 +36,7 @@ use vortex_core::{
     validate_uri, GovError, Lifecycle, ProposalCore, ProposalState, StoredInstruction, Tally, VotingConfig,
     GOVERNANCE_SEED,
 };
-use vortex_hub::Dao as HubDao;
+use vortex_hub::{Dao as HubDao, DaoToken};
 
 declare_id!("CMf1cxiDNmEasmM9VQwJSz5p4RVw1A5GZUjTEy95du1W");
 
@@ -573,6 +573,15 @@ pub struct InitGovernance<'info> {
     #[account(init, payer = payer, space = 8 + Governance::INIT_SPACE, seeds = [GOVERNANCE_SEED, hub_dao.key().as_ref()], bump)]
     pub governance: Account<'info, Governance>,
     pub mint: InterfaceAccount<'info, Mint>,
+    /// The DAO's token on record at the hub (set_dao_token): setting up -
+    /// a switch included - only works with that mint.
+    #[account(
+        seeds = [vortex_hub::TOKEN_SEED, hub_dao.key().as_ref()],
+        bump = dao_token.bump,
+        seeds::program = vortex_hub::ID,
+        constraint = dao_token.mint == mint.key() @ GovError::WrongMint,
+    )]
+    pub dao_token: Account<'info, DaoToken>,
     #[account(
         init,
         payer = payer,

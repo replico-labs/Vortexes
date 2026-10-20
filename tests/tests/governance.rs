@@ -324,8 +324,9 @@ fn only_the_creator_sets_up_a_new_daos_governance() {
     let key = Keypair::new();
     let creator = env.creator.insecure_clone();
     let create = env.ix_create_dao("Second", TW, &key.pubkey());
-    env.send(&[create], &[&creator, &key]).unwrap();
     env.dao = Pubkey::find_program_address(&[hub::DAO_SEED, key.pubkey().as_ref()], &hub::ID).0;
+    let record = env.ix_set_dao_token(&creator.pubkey(), env.mint, TW);
+    env.send(&[create, record], &[&creator, &key]).unwrap();
     let squatter = Keypair::new();
     env.svm.airdrop(&squatter.pubkey(), 1_000_000_000).unwrap();
     let ix = env.ix_init_governance(TW, &squatter.pubkey(), &squatter.pubkey(), config());
@@ -396,6 +397,53 @@ fn switching_to_quadratic_keeps_the_treasury() {
     env.warp(prop.voting_ends_at + config().timelock as i64);
     env.execute(QV, p).unwrap();
     assert_eq!(env.lamports(&carol), 2_000_000, "paid from the same treasury");
+}
+
+#[test]
+fn a_switch_keeps_the_daos_token() {
+    let (mut env, alice, _bob) = dao_with_members();
+    let creator = env.creator.insecure_clone();
+    let own = env.mint;
+    let other = CreateMint::new(&mut env.svm, &creator).decimals(6).send().unwrap();
+    assert_eq!(env.dao_token().mint, own, "recorded at creation");
+
+    // A switch that sets quadratic up on another token fails as a whole.
+    env.mint = other;
+    let init_other = stored(env.ix_init_governance(QV, &env.treasury, &env.treasury, config()));
+    env.mint = own;
+    let s = env.pass(TW, &alice, vec![stored(env.ix_propose_switch(QV)), init_other.clone()]);
+    assert_eq!(code(env.execute(TW, s)), err(GovError::WrongMint));
+    assert!(env.hub_dao().pending_switch.is_none());
+
+    // Nobody but the DAO can change the record: not the creator, not even at epoch 1.
+    let ix = env.ix_set_dao_token(&creator.pubkey(), other, TW);
+    assert_eq!(code(env.send(&[ix], &[&creator])), err(GovError::Unauthorized));
+
+    // The DAO can, deliberately, with its own instruction in the proposal.
+    let change = stored(env.ix_set_dao_token(&env.treasury, other, TW));
+    let s = env.pass(TW, &alice, vec![change, stored(env.ix_propose_switch(QV)), init_other]);
+    env.execute(TW, s).unwrap();
+    assert_eq!(env.dao_token().mint, other);
+    assert_eq!(env.governance_account(QV).mint, other);
+}
+
+#[test]
+fn setting_up_needs_the_token_on_record() {
+    let mut env = Env::bare(litesvm_token::TOKEN_ID);
+    let creator = env.creator.insecure_clone();
+    let key = Keypair::new();
+    let create = env.ix_create_dao("Unrecorded", TW, &key.pubkey());
+    env.dao = Pubkey::find_program_address(&[hub::DAO_SEED, key.pubkey().as_ref()], &hub::ID).0;
+    env.treasury = hub::treasury_address(&env.dao);
+    let init = env.ix_init_governance(TW, &creator.pubkey(), &creator.pubkey(), config());
+    assert!(env.send(&[create.clone(), init], &[&creator, &key]).is_err(), "no record, no setup");
+
+    // Recorded after the governance exists: too late for the creator.
+    let record = env.ix_set_dao_token(&creator.pubkey(), env.mint, TW);
+    let init = env.ix_init_governance(TW, &creator.pubkey(), &creator.pubkey(), config());
+    env.send(&[create, record, init], &[&creator, &key]).unwrap();
+    let again = env.ix_set_dao_token(&creator.pubkey(), env.mint, TW);
+    assert_eq!(code(env.send(&[again], &[&creator])), err(GovError::Unauthorized));
 }
 
 #[test]

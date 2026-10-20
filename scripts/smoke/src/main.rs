@@ -306,6 +306,7 @@ impl Smoke {
                 hub_dao: d.dao,
                 governance: d.governance(OPT),
                 mint: d.mint,
+                dao_token: hub::dao_token_address(&d.dao),
                 vault: d.vault(OPT),
                 bond_vault: Pubkey::find_program_address(&[vortex_optimistic::BOND_VAULT_SEED, d.governance(OPT).as_ref()], &OPT).0,
                 token_program: spl_token_interface::ID,
@@ -356,6 +357,7 @@ impl Smoke {
                 hub_dao: d.dao,
                 governance: d.governance(CONV),
                 mint: d.mint,
+                dao_token: hub::dao_token_address(&d.dao),
                 vault: d.vault(CONV),
                 token_program: spl_token_interface::ID,
                 system_program: SYSTEM,
@@ -432,6 +434,7 @@ impl Smoke {
                 hub_dao: d.dao,
                 governance: d.governance(DEL),
                 mint: d.mint,
+                dao_token: hub::dao_token_address(&d.dao),
                 vault: d.vault(DEL),
                 token_program: spl_token_interface::ID,
                 system_program: SYSTEM,
@@ -578,9 +581,23 @@ impl Smoke {
                 .to_account_metas(None),
             data: hub::instruction::CreateDao { name: name.into(), governance_program: gp }.data(),
         };
+        // The DAO's token on record (token programs only set it up with this mint).
+        let record = Instruction {
+            program_id: hub::ID,
+            accounts: hub::accounts::SetDaoToken {
+                authority: self.payer.pubkey(),
+                payer: self.payer.pubkey(),
+                dao: dao_key,
+                governance: dao.governance(gp),
+                dao_token: hub::dao_token_address(&dao_key),
+                system_program: SYSTEM,
+            }
+            .to_account_metas(None),
+            data: hub::instruction::SetDaoToken { mint }.data(),
+        };
         let init = init(&dao, &self.payer.pubkey());
         let fund = solana_system_interface::instruction::transfer(&self.payer.pubkey(), &dao.treasury, TREASURY_FUNDING);
-        let sig = self.send(&[create, init, fund], &[&create_key]).map_err(|e| format!("create DAO: {e}"))?;
+        let sig = self.send(&[create, record, init, fund], &[&create_key]).map_err(|e| format!("create DAO: {e}"))?;
         println!("  DAO {dao_key} created, treasury {} funded ({sig})", dao.treasury);
         Ok(dao)
     }
@@ -821,6 +838,7 @@ fn ix_init_voting(d: &Dao, gp: Pubkey, authority: &Pubkey, config: VotingConfig)
             hub_dao: d.dao,
             governance: d.governance(gp),
             mint: d.mint,
+            dao_token: hub::dao_token_address(&d.dao),
             vault: d.vault(gp),
             token_program: spl_token_interface::ID,
             system_program: SYSTEM,

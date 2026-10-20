@@ -57,6 +57,7 @@ fn sowellian_dao() -> (Env, Member, Member) {
             hub_dao: env.dao,
             governance: env.governance(SOW),
             mint: env.mint,
+            dao_token: hub::dao_token_address(&env.dao),
             vault: env.vault(SOW),
             escrow: escrow(env),
             token_program: env.token_program,

@@ -47,6 +47,7 @@ fn sortition_dao(seats: u8, n: usize) -> (Env, Vec<Member>) {
             governance: env.governance(SORT),
             pool: pool_pda(env),
             mint: env.mint,
+            dao_token: hub::dao_token_address(&env.dao),
             vault: env.vault(SORT),
             token_program: env.token_program,
             system_program: SYSTEM,

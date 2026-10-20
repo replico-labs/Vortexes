@@ -138,16 +138,18 @@ impl Env {
         env
     }
 
-    /// Creates the DAO in the hub and, in the same transaction, the
-    /// creator's setup in `gp` (built by `init` once the DAO's address is known).
+    /// Creates the DAO in the hub and, in the same transaction, records its
+    /// token and the creator's setup in `gp` (built by `init` once the
+    /// DAO's address is known).
     pub fn create_dao(&mut self, name: &str, gp: Pubkey, init: impl FnOnce(&Env) -> Instruction) {
         let create_key = Keypair::new();
         self.dao = Pubkey::find_program_address(&[hub::DAO_SEED, create_key.pubkey().as_ref()], &hub::ID).0;
         self.treasury = hub::treasury_address(&self.dao);
         let creator_kp = self.creator.insecure_clone();
         let create = self.ix_create_dao(name, gp, &create_key.pubkey());
+        let record = self.ix_set_dao_token(&self.creator.pubkey(), self.mint, gp);
         let init = init(self);
-        self.send(&[create, init], &[&creator_kp, &create_key]).unwrap();
+        self.send(&[create, record, init], &[&creator_kp, &create_key]).unwrap();
     }
 
     pub fn send(&mut self, ixs: &[Instruction], signers: &[&Keypair]) -> Result<(), FailedTransactionMetadata> {
@@ -232,6 +234,24 @@ impl Env {
         }
     }
 
+    /// Records (creator, at setup) or changes (treasury) the DAO's token.
+    /// `gp` is the program running the DAO now.
+    pub fn ix_set_dao_token(&self, authority: &Pubkey, mint: Pubkey, gp: Pubkey) -> Instruction {
+        Instruction {
+            program_id: hub::ID,
+            accounts: hub::accounts::SetDaoToken {
+                authority: *authority,
+                payer: *authority,
+                dao: self.dao,
+                governance: self.governance(gp),
+                dao_token: hub::dao_token_address(&self.dao),
+                system_program: SYSTEM,
+            }
+            .to_account_metas(None),
+            data: hub::instruction::SetDaoToken { mint }.data(),
+        }
+    }
+
     pub fn ix_propose_switch(&self, to: Pubkey) -> Instruction {
         Instruction {
             program_id: hub::ID,
@@ -292,6 +312,7 @@ impl Env {
                 hub_dao: self.dao,
                 governance: self.governance(gp),
                 mint: self.mint,
+                dao_token: hub::dao_token_address(&self.dao),
                 vault: self.vault(gp),
                 token_program: self.token_program,
                 system_program: SYSTEM,
@@ -453,6 +474,10 @@ impl Env {
         }
     }
 
+    pub fn dao_token(&self) -> hub::DaoToken {
+        hub::DaoToken::try_deserialize(&mut self.svm.get_account(&hub::dao_token_address(&self.dao)).unwrap().data.as_slice()).unwrap()
+    }
+
     pub fn hub_dao(&self) -> hub::Dao {
         hub::Dao::try_deserialize(&mut self.svm.get_account(&self.dao).unwrap().data.as_slice()).unwrap()
     }
@@ -610,6 +635,7 @@ impl Env {
                 hub_dao: self.dao,
                 governance: self.governance(OPT),
                 mint: self.mint,
+                dao_token: hub::dao_token_address(&self.dao),
                 vault: self.vault(OPT),
                 bond_vault: self.opt_bond_vault(),
                 token_program: self.token_program,
@@ -825,6 +851,7 @@ impl Env {
                 hub_dao: self.dao,
                 governance: self.governance(CONV),
                 mint: self.mint,
+                dao_token: hub::dao_token_address(&self.dao),
                 vault: self.vault(CONV),
                 token_program: self.token_program,
                 system_program: SYSTEM,
@@ -986,6 +1013,7 @@ impl Env {
                 hub_dao: self.dao,
                 governance: self.governance(DEL),
                 mint: self.mint,
+                dao_token: hub::dao_token_address(&self.dao),
                 vault: self.vault(DEL),
                 token_program: self.token_program,
                 system_program: SYSTEM,

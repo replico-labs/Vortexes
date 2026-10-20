@@ -30,6 +30,10 @@ On the EVM, every DAO gets its own `Treasury` contract, and switching models is 
 
 **Switching models.** A passed proposal calls the hub's `propose_switch(new_program)` and sets the DAO up in the new program. After a 2-day delay (cancellable by another proposal), anyone calls `apply_switch`: the hub now listens only to the new program, and the DAO's **epoch** goes up. Proposals only run in the epoch they were made in, so nothing from an earlier setup can ever run again, even if the DAO switches back.
 
+**The DAO's token.** The hub records each DAO's token (`set_dao_token`, a `[b"token", dao]` account). The creator records it in the creation transaction, before the first governance is set up; after that, only a passed proposal can change it. Every token-based program sets a DAO up only with the recorded mint (`WrongMint` otherwise), so a switch always keeps the token members hold. Moving to another token takes its own `set_dao_token` instruction in a proposal, never a side effect of a switch. DAOs created before the record existed record it with their first switch to a token model (the bot adds the instruction to that switch proposal).
+
+**Deposits after a switch.** Each program keeps the DAO's deposits in its own vault (`[b"vault", governance]`), and withdrawing from an old program never checks which program is active, so members can always take their tokens out of a model the DAO has left and deposit them in the new one. The bot's `/migrate` does both in one command, finding the old vaults from the DAO's address alone.
+
 ## Governance models
 
 | Model | How it decides |
@@ -141,7 +145,7 @@ anchor build      # programs into target/deploy/, IDLs into target/idl/
 cargo test        # unit tests + end-to-end tests (needs the build above)
 ```
 
-The end-to-end tests run the compiled programs in [LiteSVM](https://github.com/LiteSVM/litesvm) with the real SPL Token, Token-2022 and Associated Token programs. Current result: **76 end-to-end tests and 10 unit tests passed, 0 failed**. They cover every model's lifecycle, the hub's checks, switching between models with one treasury, and budgets.
+The end-to-end tests run the compiled programs in [LiteSVM](https://github.com/LiteSVM/litesvm) with the real SPL Token, Token-2022 and Associated Token programs. Current result: **78 end-to-end tests and 10 unit tests passed, 0 failed**. They cover every model's lifecycle, the hub's checks, switching between models with one treasury and one token (a switch onto another token fails, a deliberate `set_dao_token` change works), and budgets.
 
 `idl/` holds the IDLs for clients such as the bot; copy them from `target/idl/` after changing a program. Error codes come from `GovError` in `vortex-core` and are the same in every program.
 
@@ -204,6 +208,8 @@ External programs the models read (not ours; the same addresses on devnet and ma
 | Pyth Push Oracle | `pythWSnswVUd12oZpeFP8e9CVaEqJg25g1Vtc2biRsT` | Derives the sponsored price account addresses (`[shard u16 LE, feed id]`; shard 0) |
 
 The hub is set up and all ten models are approved. The smoke test passed on devnet for every model, including ORAO VRF randomness for a sortition draw (answered in about 2 seconds, fee 0.0003 SOL) and a Sowellian proposal resolved from Pyth's sponsored SOL/USD price account. Its token-weighted → board switch finished after the 2-day delay: the DAO now runs on board with the same treasury, and the board has paid from it.
+
+**Upgrade needed for the DAO token record.** The hub's `set_dao_token` and the token check in every token-based program are newer than the devnet deployment. Upgrade all eleven programs (`anchor program deploy` with the same keypairs keeps the addresses). Afterwards, new DAOs record their token when they're created. Existing devnet DAOs keep working; their next switch to a token model records the token first.
 
 These addresses come from program keypairs that aren't in git. Deploying from your own keypairs gives new addresses: run `anchor keys sync`, rebuild, deploy, copy the IDLs, and point the bot at them with `SOLANA_DEVNET_<MODEL>_PROGRAM_ID`.
 

@@ -251,8 +251,9 @@ fn bad_councils_are_refused() {
         (vec![x, y, z], DelegateConfig { term_length: 0, ..del_config() }, err(GovError::InvalidConfig)),
         (vec![x, y, z], DelegateConfig { recall_quorum_bps: 0, ..del_config() }, err(GovError::InvalidQuorum)),
     ] {
+        let record = env.ix_set_dao_token(&creator.pubkey(), env.mint, DEL);
         let init = env.ix_init_delegate(&creator.pubkey(), &creator.pubkey(), council, config);
-        assert_eq!(code(env.send(&[create.clone(), init], &[&creator, &key])), why);
+        assert_eq!(code(env.send(&[create.clone(), record, init], &[&creator, &key])), why);
     }
 }
 

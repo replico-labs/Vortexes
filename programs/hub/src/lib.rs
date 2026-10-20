@@ -22,6 +22,11 @@
 //!
 //! The hub's admin keeps the list of approved governance programs: a DAO
 //! can only be created with, or switched to, an approved one.
+//!
+//! The hub also records the DAO's token ([`vortex_hub::set_dao_token`]).
+//! Every token-based governance program checks it when it sets a DAO up,
+//! so a switch keeps the token members hold. Changing it takes its own
+//! instruction in a passed proposal, never a side effect of a switch.
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::{
@@ -38,6 +43,7 @@ declare_id!("5m9N12e9seKNxEXFBJSKr5vd9uryXpckSakfrzDWxMKe");
 pub const HUB_SEED: &[u8] = b"hub";
 pub const DAO_SEED: &[u8] = b"dao";
 pub const MODEL_SEED: &[u8] = b"model";
+pub const TOKEN_SEED: &[u8] = b"token";
 
 /// How long a governance switch waits before it can be applied: time for
 /// members to see it coming, and for the current model to cancel it.
@@ -92,6 +98,26 @@ pub mod vortex_hub {
         dao.treasury_bump = Pubkey::find_program_address(&[TREASURY_SEED, dao_key.as_ref()], &crate::ID).1;
         dao.executor_bump = Pubkey::find_program_address(&[EXECUTOR_SEED, dao_key.as_ref()], &crate::ID).1;
         emit!(DaoCreated { dao: dao_key, name: dao.name.clone(), creator: dao.creator, governance_program });
+        Ok(())
+    }
+
+    /// Records the mint the DAO's token-based governance uses. The creator
+    /// records it once, after create_dao and before setting up the first
+    /// governance; after that only a passed proposal (the treasury) can
+    /// change it, for a deliberate move to another token.
+    pub fn set_dao_token(ctx: Context<SetDaoToken>, mint: Pubkey) -> Result<()> {
+        let dao = &ctx.accounts.dao;
+        let dao_key = dao.key();
+        let who = ctx.accounts.authority.key();
+        let record = &mut ctx.accounts.dao_token;
+        let unset = record.dao == Pubkey::default();
+        let creator_at_setup = unset && who == dao.creator && dao.epoch == 1 && ctx.accounts.governance.data_is_empty();
+        require!(who == treasury_address(&dao_key) || creator_at_setup, GovError::Unauthorized);
+        let previous = record.mint;
+        record.dao = dao_key;
+        record.mint = mint;
+        record.bump = ctx.bumps.dao_token;
+        emit!(DaoTokenSet { dao: dao_key, previous, mint });
         Ok(())
     }
 
@@ -247,6 +273,21 @@ pub struct Dao {
     pub executor_bump: u8,
 }
 
+/// The DAO's token: `[TOKEN_SEED, dao]`. Token-based governance programs
+/// only set a DAO up with this mint.
+#[account]
+#[derive(InitSpace)]
+pub struct DaoToken {
+    pub dao: Pubkey,
+    pub mint: Pubkey,
+    pub bump: u8,
+}
+
+/// A DAO's token record.
+pub fn dao_token_address(dao: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[TOKEN_SEED, dao.as_ref()], &crate::ID).0
+}
+
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq, InitSpace)]
 pub struct PendingSwitch {
     pub program: Pubkey,
@@ -295,6 +336,23 @@ pub struct CreateDao<'info> {
     pub model: Account<'info, Model>,
     #[account(init, payer = creator, space = 8 + Dao::INIT_SPACE, seeds = [DAO_SEED, create_key.key().as_ref()], bump)]
     pub dao: Account<'info, Dao>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SetDaoToken<'info> {
+    /// The creator (first record, before the first governance is set up)
+    /// or the treasury (a passed proposal).
+    pub authority: Signer<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub dao: Account<'info, Dao>,
+    /// CHECK: the DAO's current governance account; only read for whether
+    /// it has been set up yet.
+    #[account(address = dao.governance @ GovError::WrongDao)]
+    pub governance: UncheckedAccount<'info>,
+    #[account(init_if_needed, payer = payer, space = 8 + DaoToken::INIT_SPACE, seeds = [TOKEN_SEED, dao.key().as_ref()], bump)]
+    pub dao_token: Account<'info, DaoToken>,
     pub system_program: Program<'info, System>,
 }
 
@@ -378,6 +436,14 @@ pub struct SwitchProposed {
     pub from: Pubkey,
     pub to: Pubkey,
     pub ready_at: i64,
+}
+
+#[event]
+pub struct DaoTokenSet {
+    pub dao: Pubkey,
+    /// `Pubkey::default()` when first recorded.
+    pub previous: Pubkey,
+    pub mint: Pubkey,
 }
 
 #[event]

@@ -38,6 +38,7 @@ fn setup() -> Dm {
             hub_dao: env.dao,
             governance: env.governance(DM),
             base_mint: env.mint,
+            dao_token: hub::dao_token_address(&env.dao),
             quote_mint,
             base_vault: vault(env, dm::BASE_VAULT_SEED),
             quote_vault: vault(env, dm::QUOTE_VAULT_SEED),
