@@ -209,7 +209,20 @@ External programs the models read (not ours; the same addresses on devnet and ma
 
 The hub is set up and all ten models are approved. The smoke test passed on devnet for every model, including ORAO VRF randomness for a sortition draw (answered in about 2 seconds, fee 0.0003 SOL) and a Sowellian proposal resolved from Pyth's sponsored SOL/USD price account. Its token-weighted → board switch finished after the 2-day delay: the DAO now runs on board with the same treasury, and the board has paid from it.
 
-**Upgrade needed for the DAO token record.** The hub's `set_dao_token` and the token check in every token-based program are newer than the devnet deployment. Upgrade all eleven programs (`anchor program deploy` with the same keypairs keeps the addresses). Afterwards, new DAOs record their token when they're created. Existing devnet DAOs keep working; their next switch to a token model records the token first.
+**DAO token record.** All eleven programs on devnet run the version with the hub's `set_dao_token` and the token check in every token-based program. New DAOs record their token when they're created. DAOs created before the upgrade keep working; their next switch to a token model records the token first.
+
+### Upgrading the devnet programs
+
+`scripts/upgrade-devnet.sh` uploads each program from `target/deploy/` to its address above. It needs only the upgrade authority's wallet, not the program keypairs: given an address, `solana program deploy` can only upgrade the program already there, never create a new one.
+
+```bash
+anchor build && cargo test
+solana program show 5m9N12e9seKNxEXFBJSKr5vd9uryXpckSakfrzDWxMKe --url devnet   # Authority must be your wallet
+WALLET=~/.config/solana/id.json bash scripts/upgrade-devnet.sh
+```
+
+Each upgrade writes the new code into a temporary buffer first (about 3.5 SOL of rent for the largest program, returned when it finishes). If a program has grown past its account, `solana program extend <address> 40000 --url devnet --keypair <wallet>` makes room. An interrupted upgrade leaves its buffer behind; `solana program close --buffers --url devnet --keypair <wallet>` returns the rent.
+
 
 These addresses come from program keypairs that aren't in git. Deploying from your own keypairs gives new addresses: run `anchor keys sync`, rebuild, deploy, copy the IDLs, and point the bot at them with `SOLANA_DEVNET_<MODEL>_PROGRAM_ID`.
 
