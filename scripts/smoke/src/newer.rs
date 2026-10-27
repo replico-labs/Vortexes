@@ -712,7 +712,7 @@ impl Smoke {
         Ok(())
     }
 
-    fn token_balance(&self, account: &Pubkey) -> u64 {
+    pub(crate) fn token_balance(&self, account: &Pubkey) -> u64 {
         self.rpc.get_token_account_balance(account).ok().and_then(|b| b.amount.parse().ok()).unwrap_or(0)
     }
 }

@@ -6054,6 +6054,7 @@ dependencies = [
  "vortex-core",
  "vortex-decision-markets",
  "vortex-delegate",
+ "vortex-fill",
  "vortex-hub",
  "vortex-liquid",
  "vortex-optimistic",

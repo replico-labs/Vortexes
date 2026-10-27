@@ -11,10 +11,16 @@
 //!
 //! `approve`: only sets up the hub and approves every deployed model.
 //!
+//! `fill`: Vortexes' fill program (`programs/fill`): a board DAO's proposal
+//! opens a swap order and this wallet fills it as a keeper (a stand-in pays
+//! the swap's output), checks the refusals, and cancels an expired order.
+//! Needs the hub, board and vortex-fill deployed.
+//!
 //! ```text
 //! cargo run -p vortex-smoke -- run [--url devnet] [--keypair ~/.config/solana/id.json] [--only liquid,sortition]
 //! cargo run -p vortex-smoke -- finish-switch [--url devnet]
 //! cargo run -p vortex-smoke -- approve [--url devnet]
+//! cargo run -p vortex-smoke -- fill [--url devnet]
 //! ```
 //!
 //! Sortition draws with ORAO VRF and Sowellian's oracle track reads Pyth's
@@ -28,6 +34,7 @@
 //! needs the hub admin. Program IDs come from the programs' source, so
 //! build after `anchor keys sync`.
 
+mod fill;
 mod newer;
 
 use anchor_lang::{prelude::Pubkey, AccountDeserialize, InstructionData, ToAccountMetas};
@@ -97,8 +104,9 @@ fn main() {
         Some("run") => s.run(),
         Some("finish-switch") => s.finish_switch(),
         Some("approve") => s.approve(),
+        Some("fill") => s.fill(),
         _ => {
-            eprintln!("usage: vortex-smoke <run|finish-switch|approve> [--url devnet|localhost|URL] [--keypair PATH] [--only MODEL,...]");
+            eprintln!("usage: vortex-smoke <run|finish-switch|approve|fill> [--url devnet|localhost|URL] [--keypair PATH] [--only MODEL,...]");
             std::process::exit(2);
         }
     }

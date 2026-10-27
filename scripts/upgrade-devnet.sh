@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Upgrades the eleven devnet programs in place from target/deploy/ (run `anchor build` first).
+# Upgrades the devnet programs in place from target/deploy/ (run `anchor build` first).
+# vortex_fill is last: deploy it once with scripts/deploy-fill-devnet.sh before upgrading it here.
 # WALLET is the programs' upgrade authority; it also pays for the temporary buffers.
 set -eo pipefail
 WALLET=${WALLET:-~/.config/solana/id.json}
@@ -22,4 +23,5 @@ vortex_liquid CMf1cxiDNmEasmM9VQwJSz5p4RVw1A5GZUjTEy95du1W
 vortex_sortition FjuZX6dakUUY2GxqnHiqkpDUADBJyA3GkmoT5gqvp6U5
 vortex_sowellian G99YpKvNXVQmTgvXX6XGt1z3LvbEyhhDCENwat1nsrx2
 vortex_decision_markets FfUPS88Xoao8N4QTW9SGtua1XyN2q4HyBpNha7AB5t4S
+vortex_fill 9QavLTD5JqCtemTJ1GLwxqeaByWJrs6LQtawwjtWfw77
 LIST

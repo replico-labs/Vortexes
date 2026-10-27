@@ -242,7 +242,13 @@ Each upgrade writes the new code into a temporary buffer first (about 3.5 SOL of
 
 These addresses come from program keypairs that aren't in git. Deploying from your own keypairs gives new addresses: run `anchor keys sync`, rebuild, deploy, copy the IDLs, and point the bot at them with `SOLANA_DEVNET_<MODEL>_PROGRAM_ID`.
 
-**Fill orders** (`vortex-fill`) aren't deployed: the routes they're for (Jupiter) are on mainnet only, so the program goes live there with the hub. Its address in the code, `9QavLTD5JqCtemTJ1GLwxqeaByWJrs6LQtawwjtWfw77`, comes from a keypair kept off git like the others.
+**Fill orders** (`vortex-fill`, address `9QavLTD5JqCtemTJ1GLwxqeaByWJrs6LQtawwjtWfw77`, from a keypair kept off git like the others). Jupiter routes on mainnet only, so devnet is for checking the program itself: the smoke test fills an order with a stand-in for the swap. To build, test, deploy it to devnet and run that check in one go:
+
+```bash
+WALLET=~/.config/solana/id.json bash scripts/deploy-fill-devnet.sh
+```
+
+It needs `target/deploy/vortex_fill-keypair.json` matching the address in the code. The smoke test alone: `cargo run -p vortex-smoke -- fill --url devnet`. It has a board DAO's proposal open an order (100 of its token for at least 250 of a second token), checks that a take without its settle and a short fill are refused, fills it as a keeper, and lets a second order expire and cancels it.
 
 ### Mainnet — not yet deployed
 
