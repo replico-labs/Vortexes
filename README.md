@@ -66,6 +66,7 @@ All ten Spaces models are now ported.
 | `programs/sortition` | The draw pool, ORAO-randomness draws, council votes |
 | `programs/sowellian` | Approval votes, the YES/NO market, oracle and human resolution, adjudication, bonds |
 | `programs/decision-markets` | Conditional balances, the pass and fail pools, TWAP settlement, redemption |
+| `programs/fill` | Fill orders: a treasury swaps through any route (Jupiter's included) without trusting the keeper who runs it. Not a governance model |
 | `crates/vortex-core` | Shared library: seeds, the proposal prefix every model uses, vote math, errors (not deployed) |
 
 Each program's header comment explains its rules in full.
@@ -136,6 +137,21 @@ As in Spaces' version 2: the DAO keeps a list of up to 10 assets it protects (SO
 
 The program wraps every proposal's instructions between `record_balances` and `check_budget`, so the check runs inside the hub's execution. Overspending, or closing a watched token account or giving it a new owner or delegate, reverts the whole execution. Weight cuts and removals wait 7 days. Only listed assets are watched.
 
+## Fill orders (swaps)
+
+A proposal can't usefully call a swap router: a route found when the proposal is written is stale by the time it executes, and a router's accounts and lookup tables don't fit a stored instruction. `vortex-fill` splits the swap instead. Jupiter recommends this pattern for programs (Flash Fill).
+
+1. **A passed proposal opens an order** (`open_order`). The treasury moves `amount` of one token into the order's input vault, with the least it accepts of another (`min_out`), a deadline, and the treasury account the output goes to. The treasury pays the order's rent and gets it back when the order closes.
+2. **A keeper fills it** in one transaction of its own (any route, lookup tables, any size): `take` hands it the input, it swaps, sending the output to the order's output vault, and `settle` checks that the vault gained at least `min_out` since the take. `settle` then sends everything in it to the treasury and closes the order. Less, and the whole transaction reverts, the take included.
+3. **Past the deadline anyone can `cancel`** an unfilled order, returning the input to the treasury. The treasury can cancel any time, through a proposal.
+
+How a keeper is kept honest:
+
+- `take` only runs as a top-level instruction, and only when the next instruction of this program in the transaction is a `settle` of the same order (read from the instructions sysvar). Two orders can't share one swap, and a take can't happen on its own.
+- Each order has its own output vault, owned by the order. Nothing else that pays the treasury in the same transaction counts toward a fill, such as another order's refund or a proposal executed alongside it. Only output that arrives after the take counts; anything sent to the vault earlier still goes to the treasury.
+
+The keeper gets nothing but the chance to fill. The bot runs one, filling at the best route it finds and sending all the output to the treasury. The program has its own errors (`FillError`), not `GovError`.
+
 ## Building and testing
 
 You need Rust (pinned to 1.97.1), Agave 4.3 and the Anchor CLI 1.2.1.
@@ -145,9 +161,9 @@ anchor build      # programs into target/deploy/, IDLs into target/idl/
 cargo test        # unit tests + end-to-end tests (needs the build above)
 ```
 
-The end-to-end tests run the compiled programs in [LiteSVM](https://github.com/LiteSVM/litesvm) with the real SPL Token, Token-2022 and Associated Token programs. Current result: **78 end-to-end tests and 10 unit tests passed, 0 failed**. They cover every model's lifecycle, the hub's checks, switching between models with one treasury and one token (a switch onto another token fails, a deliberate `set_dao_token` change works), and budgets.
+The end-to-end tests run the compiled programs in [LiteSVM](https://github.com/LiteSVM/litesvm) with the real SPL Token, Token-2022 and Associated Token programs. Current result: **78 end-to-end tests and 10 unit tests passed, 0 failed**. They cover every model's lifecycle, the hub's checks, switching between models with one treasury and one token (a switch onto another token fails, a deliberate `set_dao_token` change works), and budgets. `tests/tests/fill.rs` (7 tests: an order opened by a proposal and filled by a keeper, short fills, takes without their settle, output sent before the take, expiry and cancels) is new and hasn't been run yet.
 
-`idl/` holds the IDLs for clients such as the bot; copy them from `target/idl/` after changing a program. Error codes come from `GovError` in `vortex-core` and are the same in every program.
+`idl/` holds the IDLs for clients such as the bot; copy them from `target/idl/` after changing a program. Error codes come from `GovError` in `vortex-core` and are the same in every governance program; `vortex-fill` has its own (`FillError`).
 
 ## Deployment
 
@@ -225,6 +241,8 @@ Each upgrade writes the new code into a temporary buffer first (about 3.5 SOL of
 
 
 These addresses come from program keypairs that aren't in git. Deploying from your own keypairs gives new addresses: run `anchor keys sync`, rebuild, deploy, copy the IDLs, and point the bot at them with `SOLANA_DEVNET_<MODEL>_PROGRAM_ID`.
+
+**Fill orders** (`vortex-fill`) aren't deployed: the routes they're for (Jupiter) are on mainnet only, so the program goes live there with the hub. Its address in the code, `9QavLTD5JqCtemTJ1GLwxqeaByWJrs6LQtawwjtWfw77`, comes from a keypair kept off git like the others.
 
 ### Mainnet — not yet deployed
 

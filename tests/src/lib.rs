@@ -1,5 +1,5 @@
-//! Test harness shared by the end-to-end tests: the compiled hub and
-//! governance programs in LiteSVM, with the real SPL Token, Token-2022 and Associated
+//! Test harness shared by the end-to-end tests: the compiled hub,
+//! governance programs and fill program in LiteSVM, with the real SPL Token, Token-2022 and Associated
 //! Token programs. Build first with `anchor build`.
 //!
 //! token-weighted and quadratic share their source (token_voting.rs), so
@@ -36,6 +36,7 @@ pub const LIQ: Pubkey = vortex_liquid::ID;
 pub const SORT: Pubkey = vortex_sortition::ID;
 pub const SOW: Pubkey = vortex_sowellian::ID;
 pub const DM: Pubkey = vortex_decision_markets::ID;
+pub const FILL: Pubkey = vortex_fill::ID;
 pub const SYSTEM: Pubkey = anchor_lang::system_program::ID;
 
 pub fn config() -> VotingConfig {
@@ -94,6 +95,7 @@ impl Env {
             (SORT, "vortex_sortition"),
             (SOW, "vortex_sowellian"),
             (DM, "vortex_decision_markets"),
+            (FILL, "vortex_fill"),
         ] {
             if let Err(e) = svm.add_program_from_file(id, format!("{DIR}{name}.so")) {
                 panic!(

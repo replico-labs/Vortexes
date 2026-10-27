@@ -5987,6 +5987,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "vortex-fill"
+version = "0.1.0"
+dependencies = [
+ "anchor-lang",
+ "anchor-spl",
+ "solana-instructions-sysvar 3.0.1",
+]
+
+[[package]]
 name = "vortex-hub"
 version = "0.1.0"
 dependencies = [
@@ -6086,6 +6095,7 @@ dependencies = [
  "solana-clock 4.0.0",
  "solana-instruction 4.0.0",
  "solana-instruction-error",
+ "solana-instructions-sysvar 3.0.1",
  "solana-keypair",
  "solana-message 4.6.0",
  "solana-sha256-hasher",
@@ -6100,6 +6110,7 @@ dependencies = [
  "vortex-core",
  "vortex-decision-markets",
  "vortex-delegate",
+ "vortex-fill",
  "vortex-hub",
  "vortex-liquid",
  "vortex-optimistic",

@@ -1,0 +1,549 @@
+{
+  "address": "9QavLTD5JqCtemTJ1GLwxqeaByWJrs6LQtawwjtWfw77",
+  "metadata": {
+    "name": "vortex_fill",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Vortexes fill: a DAO swaps through any route without trusting whoever runs it. The treasury posts tokens with a minimum to receive and a deadline; a keeper takes them and swaps in its own transaction, which only lands if the minimum reaches the order."
+  },
+  "instructions": [
+    {
+      "name": "cancel",
+      "docs": [
+        "Calls off an order that hasn't filled: its input goes back to the",
+        "owner's account it came from (and anything sent to its output vault",
+        "to the owner's receiving account). The owner can cancel any time;",
+        "past the deadline, anyone can."
+      ],
+      "discriminator": [
+        232,
+        219,
+        223,
+        41,
+        219,
+        236,
+        220,
+        190
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "docs": [
+            "The owner (any time) or anyone (past the deadline)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "order",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true
+        },
+        {
+          "name": "input_vault",
+          "writable": true
+        },
+        {
+          "name": "output_vault",
+          "writable": true
+        },
+        {
+          "name": "mint_in"
+        },
+        {
+          "name": "mint_out"
+        },
+        {
+          "name": "refund",
+          "writable": true
+        },
+        {
+          "name": "receive",
+          "writable": true
+        },
+        {
+          "name": "token_program_in"
+        },
+        {
+          "name": "token_program_out"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "open_order",
+      "docs": [
+        "Puts `amount` of `mint_in` up for at least `min_out` of `mint_out`",
+        "until `deadline` (unix seconds). The owner (a DAO's treasury, through",
+        "a passed proposal) signs, pays the order's rent and gets it back when",
+        "the order closes. `id` picks the order's address: any number the",
+        "owner hasn't got an open order under."
+      ],
+      "discriminator": [
+        206,
+        88,
+        88,
+        143,
+        38,
+        136,
+        50,
+        224
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "docs": [
+            "Owns the tokens, pays the rent."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "mint_in"
+        },
+        {
+          "name": "mint_out"
+        },
+        {
+          "name": "source",
+          "writable": true
+        },
+        {
+          "name": "receive"
+        },
+        {
+          "name": "order",
+          "writable": true
+        },
+        {
+          "name": "input_vault",
+          "writable": true
+        },
+        {
+          "name": "output_vault",
+          "writable": true
+        },
+        {
+          "name": "token_program_in"
+        },
+        {
+          "name": "token_program_out"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "id",
+          "type": "u64"
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "min_out",
+          "type": "u64"
+        },
+        {
+          "name": "deadline",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "settle",
+      "docs": [
+        "Ends a fill: the output vault must have gained at least `min_out`",
+        "since the take. Everything in it goes to the owner's account and the",
+        "order closes. Anyone can call it; the keeper does, in the take's",
+        "transaction."
+      ],
+      "discriminator": [
+        175,
+        42,
+        185,
+        87,
+        144,
+        131,
+        102,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "order",
+          "writable": true
+        },
+        {
+          "name": "owner",
+          "writable": true
+        },
+        {
+          "name": "input_vault",
+          "writable": true
+        },
+        {
+          "name": "output_vault",
+          "writable": true
+        },
+        {
+          "name": "mint_in"
+        },
+        {
+          "name": "mint_out"
+        },
+        {
+          "name": "refund",
+          "writable": true
+        },
+        {
+          "name": "receive",
+          "writable": true
+        },
+        {
+          "name": "token_program_in"
+        },
+        {
+          "name": "token_program_out"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "take",
+      "docs": [
+        "A keeper takes the order's input to swap. Top-level only, and the",
+        "transaction must settle this order afterwards."
+      ],
+      "discriminator": [
+        149,
+        226,
+        52,
+        104,
+        6,
+        142,
+        230,
+        39
+      ],
+      "accounts": [
+        {
+          "name": "keeper",
+          "signer": true
+        },
+        {
+          "name": "order",
+          "writable": true
+        },
+        {
+          "name": "input_vault",
+          "writable": true
+        },
+        {
+          "name": "output_vault"
+        },
+        {
+          "name": "mint_in"
+        },
+        {
+          "name": "keeper_account",
+          "docs": [
+            "Where the keeper takes the input, to swap it."
+          ],
+          "writable": true
+        },
+        {
+          "name": "token_program_in"
+        },
+        {
+          "name": "instructions"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Order",
+      "discriminator": [
+        134,
+        173,
+        223,
+        185,
+        77,
+        86,
+        28,
+        51
+      ]
+    }
+  ],
+  "events": [
+    {
+      "discriminator": [
+        108,
+        56,
+        128,
+        68,
+        168,
+        113,
+        168,
+        239
+      ],
+      "name": "OrderCancelled"
+    },
+    {
+      "discriminator": [
+        120,
+        124,
+        109,
+        66,
+        249,
+        116,
+        174,
+        30
+      ],
+      "name": "OrderFilled"
+    },
+    {
+      "discriminator": [
+        2,
+        254,
+        197,
+        24,
+        41,
+        166,
+        225,
+        56
+      ],
+      "name": "OrderOpened"
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidAmount",
+      "msg": "The amount and the minimum to receive must both be above 0"
+    },
+    {
+      "code": 6001,
+      "name": "DeadlinePassed",
+      "msg": "The deadline has already passed"
+    },
+    {
+      "code": 6002,
+      "name": "SameMint",
+      "msg": "The order must swap one token for another"
+    },
+    {
+      "code": 6003,
+      "name": "NotTopLevel",
+      "msg": "Take only runs as a top-level instruction"
+    },
+    {
+      "code": 6004,
+      "name": "SettleMissing",
+      "msg": "A take must be followed by a settle of the same order, with no other instruction of this program in between"
+    },
+    {
+      "code": 6005,
+      "name": "AlreadyTaken",
+      "msg": "The order has already been taken in this transaction"
+    },
+    {
+      "code": 6006,
+      "name": "OrderExpired",
+      "msg": "The order is past its deadline"
+    },
+    {
+      "code": 6007,
+      "name": "NotTaken",
+      "msg": "The order hasn't been taken"
+    },
+    {
+      "code": 6008,
+      "name": "BelowMinimum",
+      "msg": "The swap returned less than the order's minimum"
+    },
+    {
+      "code": 6009,
+      "name": "NotExpired",
+      "msg": "Only the owner can cancel before the deadline"
+    },
+    {
+      "code": 6010,
+      "name": "WrongAccount",
+      "msg": "That account doesn't belong to this order"
+    }
+  ],
+  "types": [
+    {
+      "name": "Order",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "mint_in",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint_out",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_in",
+            "docs": [
+              "What the input vault received (after any transfer fee)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "min_out",
+            "type": "u64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          },
+          {
+            "name": "refund",
+            "docs": [
+              "The owner's account the input returns to on a cancel."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "receive",
+            "docs": [
+              "The owner's account the output goes to."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "output_before",
+            "docs": [
+              "The output vault's balance at the take; set only inside a fill",
+              "transaction (it either settles or reverts)."
+            ],
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "input_bump",
+            "type": "u8"
+          },
+          {
+            "name": "output_bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderCancelled",
+      "type": {
+        "fields": [
+          {
+            "name": "order",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "by_owner",
+            "type": "bool"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "name": "OrderFilled",
+      "type": {
+        "fields": [
+          {
+            "name": "order",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "amount_out",
+            "type": "u64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "name": "OrderOpened",
+      "type": {
+        "fields": [
+          {
+            "name": "order",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "mint_in",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "mint_out",
+            "type": "pubkey"
+          },
+          {
+            "name": "min_out",
+            "type": "u64"
+          },
+          {
+            "name": "deadline",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    }
+  ]
+}
