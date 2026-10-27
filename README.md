@@ -2,7 +2,7 @@
 
 The SVM implementation of [DAO Spaces](https://github.com/replico-labs/Spaces): on-chain DAO governance on Solana where a DAO's treasury and its governance rules are separate, so a DAO can change how it decides by vote, without its treasury moving.
 
-Built with Anchor 1.2.1 on Agave 4.3. All eleven programs are deployed on devnet, where every model has passed the smoke test; not on mainnet. The companion bot lives in [`protean-bot`](https://github.com/replico-labs/protean-bot).
+Built with Anchor 1.2.1 on Agave 4.3. All twelve programs (the hub, ten models and the fill program) are deployed on devnet, where each has passed the smoke test; not on mainnet. The companion bot lives in [`protean-bot`](https://github.com/replico-labs/protean-bot).
 
 ## Why it's built differently from Spaces
 
@@ -161,7 +161,7 @@ anchor build      # programs into target/deploy/, IDLs into target/idl/
 cargo test        # unit tests + end-to-end tests (needs the build above)
 ```
 
-The end-to-end tests run the compiled programs in [LiteSVM](https://github.com/LiteSVM/litesvm) with the real SPL Token, Token-2022 and Associated Token programs. Current result: **78 end-to-end tests and 10 unit tests passed, 0 failed**. They cover every model's lifecycle, the hub's checks, switching between models with one treasury and one token (a switch onto another token fails, a deliberate `set_dao_token` change works), and budgets. `tests/tests/fill.rs` (7 tests: an order opened by a proposal and filled by a keeper, short fills, takes without their settle, output sent before the take, expiry and cancels) is new and hasn't been run yet.
+The end-to-end tests run the compiled programs in [LiteSVM](https://github.com/LiteSVM/litesvm) with the real SPL Token, Token-2022 and Associated Token programs. Current result: **78 end-to-end tests and 10 unit tests passed, 0 failed**. They cover every model's lifecycle, the hub's checks, switching between models with one treasury and one token (a switch onto another token fails, a deliberate `set_dao_token` change works), and budgets. `tests/tests/fill.rs` (7 tests: an order opened by a proposal and filled by a keeper, short fills, takes without their settle, output sent before the take, expiry and cancels) passed, 7 of 7.
 
 `idl/` holds the IDLs for clients such as the bot; copy them from `target/idl/` after changing a program. Error codes come from `GovError` in `vortex-core` and are the same in every governance program; `vortex-fill` has its own (`FillError`).
 
@@ -212,6 +212,7 @@ Approving needs the hub admin's wallet; with another wallet, unapproved models a
 | `vortex-sortition` | `FjuZX6dakUUY2GxqnHiqkpDUADBJyA3GkmoT5gqvp6U5` |
 | `vortex-sowellian` | `G99YpKvNXVQmTgvXX6XGt1z3LvbEyhhDCENwat1nsrx2` |
 | `vortex-decision-markets` | `FfUPS88Xoao8N4QTW9SGtua1XyN2q4HyBpNha7AB5t4S` |
+| `vortex-fill` | `9QavLTD5JqCtemTJ1GLwxqeaByWJrs6LQtawwjtWfw77` |
 
 Each program's IDL is also published on-chain in its metadata account (`anchor program deploy` writes it).
 
@@ -248,7 +249,7 @@ These addresses come from program keypairs that aren't in git. Deploying from yo
 WALLET=~/.config/solana/id.json bash scripts/deploy-fill-devnet.sh
 ```
 
-It needs `target/deploy/vortex_fill-keypair.json` matching the address in the code. The smoke test alone: `cargo run -p vortex-smoke -- fill --url devnet`. It has a board DAO's proposal open an order (100 of its token for at least 250 of a second token), checks that a take without its settle and a short fill are refused, fills it as a keeper, and lets a second order expire and cancels it.
+It needs `target/deploy/vortex_fill-keypair.json` matching the address in the code. **Deployed on devnet** (slot 515849711, upgrade authority `5BmARdL3uzCiX3wDXnxoJL98J14kVxfFTEMPeacs5Qo5`); the smoke test passed there through the hub: the proposal opened the order, the four refusals held (take without settle, short fill, early cancel by a stranger, fill past the deadline), the fill paid the treasury 260 against a minimum of 250 and returned the rent, and the expired order's tokens went back on cancel. The smoke test alone: `cargo run -p vortex-smoke -- fill --url devnet`. It has a board DAO's proposal open an order (100 of its token for at least 250 of a second token), checks that a take without its settle and a short fill are refused, fills it as a keeper, and lets a second order expire and cancels it.
 
 ### Mainnet — not yet deployed
 
