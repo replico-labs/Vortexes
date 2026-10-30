@@ -21,8 +21,11 @@ use anchor_lang::solana_program::{
 };
 
 pub const MAX_BPS: u16 = 10_000;
-/// Instructions one proposal may carry.
-pub const MAX_INSTRUCTIONS: usize = 8;
+/// Instructions one proposal may carry. Below what the execute transaction
+/// can hold anyway (64 accounts and 4,096 bytes in a v1 transaction, 64
+/// instruction entries counting every CPI the instructions make), so those
+/// stay the real limits; this keeps a proposal short enough to review.
+pub const MAX_INSTRUCTIONS: usize = 16;
 /// Longest metadata URI / description a proposal stores.
 pub const MAX_URI_LEN: usize = 200;
 /// Longest DAO name.

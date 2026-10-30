@@ -20,7 +20,7 @@ pub use litesvm_token::{CreateAssociatedTokenAccount, CreateMint, MintTo};
 pub use solana_instruction::Instruction;
 pub use solana_keypair::Keypair;
 pub use solana_signer::Signer;
-pub use vortex_core::{GovError, ProposalState, StoredAccountMeta, StoredInstruction, VotingConfig, GOVERNANCE_SEED};
+pub use vortex_core::{GovError, ProposalState, StoredAccountMeta, StoredInstruction, VotingConfig, GOVERNANCE_SEED, MAX_INSTRUCTIONS};
 pub use vortex_hub as hub;
 pub use vortex_token_weighted::{self as tw, Governance, Proposal, VoteChoice, Voter};
 

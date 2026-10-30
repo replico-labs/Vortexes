@@ -119,8 +119,10 @@ fn the_bar_follows_the_budget_and_rule_changes_cost_everything() {
     let mut sneaky = env.conv_admin_ix(conv::instruction::RecordBalances {}.data());
     sneaky.accounts.truncate(1);
     assert_eq!(code(env.conv_propose(&alice, vec![sneaky], vec![])), err(GovError::ReservedInstruction));
-    assert_eq!(code(env.conv_propose(&alice, vec![pay.clone(); 7], vec![])), err(GovError::TooManyInstructions), "6 plus the 2 budget steps");
-    env.conv_propose(&alice, vec![pay; 6], vec![]).unwrap();
+    // The count alone, with instructions small enough that 15 fit a legacy propose.
+    let tiny = StoredInstruction { program_id: Pubkey::new_unique(), accounts: vec![], data: vec![] };
+    assert_eq!(code(env.conv_propose(&alice, vec![tiny.clone(); MAX_INSTRUCTIONS - 1], vec![])), err(GovError::TooManyInstructions), "14 plus the 2 budget steps");
+    env.conv_propose(&alice, vec![tiny; MAX_INSTRUCTIONS - 2], vec![]).unwrap();
 }
 
 #[test]
