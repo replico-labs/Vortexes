@@ -193,9 +193,11 @@ The keeper gets nothing but the chance to fill. The bot runs one, filling at the
 You need Rust (pinned to 1.97.1), Agave 4.3 and the Anchor CLI 1.2.1.
 
 ```bash
-anchor build      # programs into target/deploy/, IDLs into target/idl/
-cargo test        # unit tests + end-to-end tests (needs the build above)
+anchor build --ignore-keys   # programs into target/deploy/, IDLs into target/idl/
+cargo test                   # unit tests + end-to-end tests (needs the build above)
 ```
+
+`--ignore-keys`: without the deployer's program keypairs, `anchor build` makes random ones in `target/deploy/` and then refuses to build because they don't match the program IDs in the code. The tests load each program at the ID in the code, so the keypairs don't matter for them. Don't run `anchor keys sync` to silence it: that rewrites every program ID to your random keypairs' addresses.
 
 Build each program on its own if `anchor build` isn't available: `cargo build-sbf --manifest-path programs/<name>/Cargo.toml` (and `scripts/orao-stub`, `scripts/hub-stub`).
 

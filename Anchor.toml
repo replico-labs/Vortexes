@@ -7,7 +7,7 @@ resolution = true
 skip-lint = false
 
 [workspace]
-members = ["programs/hub", "programs/token-weighted", "programs/quadratic", "programs/optimistic", "programs/board", "programs/conviction", "programs/delegate", "programs/liquid", "programs/sortition", "programs/sowellian", "programs/decision-markets", "programs/fill", "programs/stake"]
+members = ["programs/hub", "programs/token-weighted", "programs/quadratic", "programs/optimistic", "programs/board", "programs/conviction", "programs/delegate", "programs/liquid", "programs/sortition", "programs/sowellian", "programs/decision-markets", "programs/fill", "programs/stake", "programs/distribution", "programs/vault"]
 
 # The devnet deployment's program IDs (keypairs kept off git by their deployer).
 [programs.localnet]
