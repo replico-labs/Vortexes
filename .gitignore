@@ -7,3 +7,4 @@ keys/
 
 # Smoke test state (throwaway devnet keys for finish-switch)
 scripts/smoke/.state/
+.DS_Store
