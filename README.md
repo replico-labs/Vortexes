@@ -2,7 +2,7 @@
 
 The SVM implementation of [DAO Spaces](https://github.com/replico-labs/Spaces): on-chain DAO governance on Solana where a DAO's treasury and its governance rules are separate, so a DAO can change how it decides by vote, without its treasury moving.
 
-Built with Anchor 1.2.1 on Agave 4.3. Thirteen programs: the hub, the stake pool, ten models and the fill program. The devnet deployment runs the version before the stake pool and the security council (see [Devnet](#devnet)); nothing is on mainnet. The companion bot lives in [`protean-bot`](https://github.com/replico-labs/protean-bot).
+Built with Anchor 1.2.1 on Agave 4.3. Fifteen programs: the hub, the stake pool, ten models, the fill program, distribution (Distributors and raises) and the prop-firm vault. All fifteen are on devnet (see [Devnet](#devnet)); nothing is on mainnet. The companion bot lives in [`protean-bot`](https://github.com/replico-labs/protean-bot).
 
 ## Why it's built differently from Spaces
 
@@ -274,8 +274,9 @@ Approving needs the hub admin's wallet; with another wallet, unapproved models a
 | `vortex-sowellian` | `G99YpKvNXVQmTgvXX6XGt1z3LvbEyhhDCENwat1nsrx2` |
 | `vortex-decision-markets` | `FfUPS88Xoao8N4QTW9SGtua1XyN2q4HyBpNha7AB5t4S` |
 | `vortex-fill` | `9QavLTD5JqCtemTJ1GLwxqeaByWJrs6LQtawwjtWfw77` |
-| `vortex-stake` | `7T27h8r13Xmp1m4vQbHFfs1xTqdQaHnxW7ybHvwjqKAd` (not deployed yet) |
-| `vortex-distribution` | `4FeTS89hg2BtrkV2vN73be93bVvokBRHR7gbC6uUJgAq` (not deployed yet) |
+| `vortex-stake` | `7T27h8r13Xmp1m4vQbHFfs1xTqdQaHnxW7ybHvwjqKAd` |
+| `vortex-distribution` | `4FeTS89hg2BtrkV2vN73be93bVvokBRHR7gbC6uUJgAq` |
+| `vortex-vault` | `GjVM1GkPEzXMRLsrP2FLr9UXJpXDVnwGVsVYbzTvtAU5` |
 
 Each program's IDL is also published on-chain in its metadata account (`anchor program deploy` writes it).
 
@@ -291,7 +292,7 @@ The hub is set up and all ten models are approved. The smoke test passed on devn
 
 **DAO token record.** All eleven programs on devnet run the version with the hub's `set_dao_token` and the token check in every token-based program.
 
-**Not on devnet yet: the stake pool, epoch addresses and the security council.** Account layouts change (the hub's DAO record, every governance and proposal account), so after the upgrade devnet DAOs are made fresh. Deploy `vortex-stake` and upgrade the rest with `scripts/upgrade-devnet.sh` (it deploys a program that isn't there yet from its keypair), then rerun the smoke test.
+**Current version on devnet: the stake pool, epoch addresses, the security council, distribution and the vault.** Deployed and upgraded with `scripts/deploy.sh` as SBPF v3 builds (upgrade authority and hub admin `5BmARdL3uzCiX3wDXnxoJL98J14kVxfFTEMPeacs5Qo5`). Account layouts changed, so DAOs made before this upgrade don't work with it; make them fresh. The smoke test then passed on devnet for all ten models (each DAO staked through its pool and paid from its treasury through the hub, ORAO answered the sortition draw in 2 seconds, a Sowellian proposal resolved from Pyth's SOL/USD price), and a token-weighted → board switch was started, to finish after the hub's 2-day delay (`finish-switch` from unix time 1794231757). The fill smoke test passed on the upgraded build too: the order paid the treasury 260 against a minimum of 250, the expired order's 100 came back on cancel, and all four refusals held.
 
 ### Upgrading the devnet programs
 
