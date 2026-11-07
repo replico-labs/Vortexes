@@ -12,7 +12,7 @@ fn full_lifecycle_pays_out_from_the_hub_treasury() {
     let (mut env, alice, bob) = dao_with_members();
     let d = env.hub_dao();
     assert_eq!((d.governance_program, d.governance, d.epoch), (TW, env.governance(TW), 1));
-    assert_eq!(env.governance_account(TW).total_deposited, 1_000);
+    assert_eq!(env.pool_account(&env.pool()).total, 1_000);
     assert_eq!(env.token_balance(&env.vault(TW)), 1_000);
 
     // The treasury also holds tokens; the proposal pays SOL and tokens.
@@ -205,30 +205,38 @@ fn vote_records_can_be_closed_after_voting() {
 }
 
 #[test]
-fn deposits_must_use_the_daos_own_vault_and_mint() {
+fn stakes_must_use_the_daos_own_vault_and_current_pool() {
     let (mut env, alice, _bob) = dao_with_members();
     let creator = env.creator.insecure_clone();
-    let other_mint = CreateMint::new(&mut env.svm, &creator).decimals(6).send().unwrap();
     let attacker = Keypair::new().pubkey();
-    let fake_vault = CreateAssociatedTokenAccount::new(&mut env.svm, &creator, &other_mint).owner(&attacker).send().unwrap();
-    let alice_other = CreateAssociatedTokenAccount::new(&mut env.svm, &creator, &other_mint).owner(&alice.kp.pubkey()).send().unwrap();
-    MintTo::new(&mut env.svm, &creator, &other_mint, &alice_other, 1_000).send().unwrap();
+    let fake_vault = CreateAssociatedTokenAccount::new(&mut env.svm, &creator, &env.mint).owner(&attacker).send().unwrap();
+    let pool = env.pool();
     let ix = Instruction {
-        program_id: TW,
-        accounts: tw::accounts::Deposit {
+        program_id: STAKE,
+        accounts: stake::accounts::StakeTokens {
             owner: alice.kp.pubkey(),
-            governance: env.governance(TW),
-            voter: env.voter_pda(TW, &alice.kp.pubkey()),
-            owner_token_account: alice_other,
+            pool,
+            dao_token: hub::dao_token_address(&env.dao),
+            stake: Env::stake_pda(&pool, &alice.kp.pubkey()),
+            owner_token_account: alice.ata,
             vault: fake_vault,
-            mint: other_mint,
+            mint: env.mint,
             token_program: litesvm_token::TOKEN_ID,
             system_program: SYSTEM,
         }
         .to_account_metas(None),
-        data: tw::instruction::Deposit { amount: 1_000 }.data(),
+        data: stake::instruction::Stake { amount: 1 }.data(),
     };
-    assert_eq!(code(env.send(&[ix], &[&alice.kp])), err(GovError::WrongDao));
+    assert_eq!(code(env.send(&[ix], &[&alice.kp])), err(GovError::WrongPool));
+
+    // A pool for another token can be opened by anyone, but nobody can stake
+    // into it until the DAO makes it current.
+    let other_mint = CreateMint::new(&mut env.svm, &creator).decimals(6).send().unwrap();
+    let alice_other = CreateAssociatedTokenAccount::new(&mut env.svm, &creator, &other_mint).owner(&alice.kp.pubkey()).send().unwrap();
+    MintTo::new(&mut env.svm, &creator, &other_mint, &alice_other, 1_000).send().unwrap();
+    let open = env.ix_create_pool(other_mint, litesvm_token::TOKEN_ID);
+    env.send(&[open], &[&creator]).unwrap();
+    assert_eq!(code(env.stake_into(other_mint, litesvm_token::TOKEN_ID, &alice.kp, alice_other, 1_000)), err(GovError::PoolNotCurrent));
 }
 
 #[test]
@@ -400,34 +408,6 @@ fn switching_to_quadratic_keeps_the_treasury() {
 }
 
 #[test]
-fn a_switch_keeps_the_daos_token() {
-    let (mut env, alice, _bob) = dao_with_members();
-    let creator = env.creator.insecure_clone();
-    let own = env.mint;
-    let other = CreateMint::new(&mut env.svm, &creator).decimals(6).send().unwrap();
-    assert_eq!(env.dao_token().mint, own, "recorded at creation");
-
-    // A switch that sets quadratic up on another token fails as a whole.
-    env.mint = other;
-    let init_other = stored(env.ix_init_governance(QV, &env.treasury, &env.treasury, config()));
-    env.mint = own;
-    let s = env.pass(TW, &alice, vec![stored(env.ix_propose_switch(QV)), init_other.clone()]);
-    assert_eq!(code(env.execute(TW, s)), err(GovError::WrongMint));
-    assert!(env.hub_dao().pending_switch.is_none());
-
-    // Nobody but the DAO can change the record: not the creator, not even at epoch 1.
-    let ix = env.ix_set_dao_token(&creator.pubkey(), other, TW);
-    assert_eq!(code(env.send(&[ix], &[&creator])), err(GovError::Unauthorized));
-
-    // The DAO can, deliberately, with its own instruction in the proposal.
-    let change = stored(env.ix_set_dao_token(&env.treasury, other, TW));
-    let s = env.pass(TW, &alice, vec![change, stored(env.ix_propose_switch(QV)), init_other]);
-    env.execute(TW, s).unwrap();
-    assert_eq!(env.dao_token().mint, other);
-    assert_eq!(env.governance_account(QV).mint, other);
-}
-
-#[test]
 fn setting_up_needs_the_token_on_record() {
     let mut env = Env::bare(litesvm_token::TOKEN_ID);
     let creator = env.creator.insecure_clone();
@@ -450,12 +430,10 @@ fn setting_up_needs_the_token_on_record() {
 fn a_pending_switch_can_be_cancelled_and_needs_an_approved_model() {
     let (mut env, alice, _bob) = dao_with_members();
     let admin = env.admin.insecure_clone();
-    // Can't switch to a disabled model, or to the one already running.
+    // Can't switch to a disabled model.
     env.send(&[env.ix_set_model(QV, "quadratic", false)], &[&admin]).unwrap();
     let p = env.pass(TW, &alice, vec![stored(env.ix_propose_switch(QV))]);
     assert_eq!(code(env.execute(TW, p)), err(GovError::ModelNotApproved));
-    let p = env.pass(TW, &alice, vec![stored(env.ix_propose_switch(TW))]);
-    assert_eq!(code(env.execute(TW, p)), err(GovError::AlreadyActive));
 
     env.send(&[env.ix_set_model(QV, "quadratic", true)], &[&admin]).unwrap();
     let start = env.pass(TW, &alice, vec![stored(env.ix_propose_switch(QV))]);
@@ -492,21 +470,53 @@ fn switching_back_leaves_old_proposals_dead() {
     env.warp(env.hub_dao().pending_switch.unwrap().ready_at);
     env.apply_switch(QV).unwrap();
 
-    // quadratic -> back to token-weighted (already set up there, deposits intact).
+    // quadratic -> back to token-weighted: a fresh setup for epoch 3, made
+    // by the treasury in the same proposal, never the epoch-1 account.
     env.deposit(QV, &alice, 400).unwrap();
-    let back = env.pass(QV, &alice, vec![stored(env.ix_propose_switch(TW))]);
+    env.pin(TW, 3);
+    let init_tw = stored(env.ix_init_governance(TW, &env.treasury, &env.treasury, config()));
+    let back = env.pass(QV, &alice, vec![stored(env.ix_propose_switch(TW)), init_tw]);
     env.execute(QV, back).unwrap();
     env.warp(env.hub_dao().pending_switch.unwrap().ready_at);
     env.apply_switch(TW).unwrap();
-    assert_eq!(env.hub_dao().epoch, 3);
+    let d = env.hub_dao();
+    assert_eq!((d.epoch, d.governance), (3, env.governance_at(TW, 3)));
+    assert_ne!(env.governance_at(TW, 3), env.governance_at(TW, 1));
+    assert_eq!((env.governance_account(TW).epoch, env.governance_account(TW).proposal_count), (3, 0), "starts clean");
 
-    // The token-weighted proposal from epoch 1 stays dead.
+    // The token-weighted proposal from epoch 1 stays dead: it belongs to
+    // the epoch-1 account, which no longer runs the DAO.
     assert_eq!(env.proposal_account(leftover).core.epoch, 1);
-    assert_eq!(code(env.execute(TW, leftover)), err(GovError::StaleProposal));
-    // New ones work, with alice's token-weighted deposit still there.
-    assert_eq!(env.voter_account(TW, &alice.kp.pubkey()).amount, 600);
+    assert_eq!(code(env.execute(TW, leftover)), err(GovError::WrongDao));
+    // New ones work once members deposit into the new setup.
+    env.withdraw(QV, &alice, 400).unwrap();
+    env.deposit(TW, &alice, 400).unwrap();
     let p = env.pass(TW, &alice, vec![env.pay_sol(&alice.kp.pubkey(), 9)]);
     assert_eq!(env.proposal_account(p).core.epoch, 3);
+    env.execute(TW, p).unwrap();
+}
+
+#[test]
+fn a_fresh_copy_of_the_running_model() {
+    let (mut env, alice, bob) = dao_with_members();
+    // token-weighted -> token-weighted with new rules: a fresh epoch-2 setup.
+    let stricter = VotingConfig { quorum_bps: 5_000, ..config() };
+    env.pin(TW, 2);
+    let init = stored(env.ix_init_governance(TW, &env.treasury, &env.treasury, stricter));
+    env.pin(TW, 1);
+    let s = env.pass(TW, &alice, vec![stored(env.ix_propose_switch(TW)), init]);
+    env.execute(TW, s).unwrap();
+    env.warp(env.hub_dao().pending_switch.unwrap().ready_at);
+    env.pin(TW, 2);
+    env.apply_switch(TW).unwrap();
+    let d = env.hub_dao();
+    assert_eq!((d.governance_program, d.epoch, d.governance), (TW, 2, env.governance_at(TW, 2)));
+    assert_eq!(env.governance_account(TW).config.quorum_bps, 5_000);
+
+    // Members' stake carries over: nothing to move.
+    assert_eq!(env.pool_account(&env.pool()).total, 1_000);
+    let _ = &bob;
+    let p = env.pass(TW, &alice, vec![env.pay_sol(&alice.kp.pubkey(), 9)]);
     env.execute(TW, p).unwrap();
 }
 

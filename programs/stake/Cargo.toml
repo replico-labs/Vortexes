@@ -1,0 +1,30 @@
+[package]
+name = "vortex-stake"
+description = "Vortexes stake: one stake pool per DAO per token. Members stake once; every governance model the DAO switches to reads voting power from the same pool, and a token change opens a new pool while the old one keeps paying out."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "vortex_stake"
+
+[features]
+default = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+custom-heap = []
+custom-panic = []
+anchor-debug = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = { workspace = true, features = ["init-if-needed"] }
+anchor-spl = { workspace = true }
+vortex-core = { path = "../../crates/vortex-core" }
+vortex-hub = { path = "../hub", features = ["cpi"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

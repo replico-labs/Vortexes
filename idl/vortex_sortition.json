@@ -28,10 +28,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -61,10 +58,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -103,10 +97,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -117,86 +108,6 @@
         {
           "name": "epoch",
           "type": "u32"
-        }
-      ]
-    },
-    {
-      "name": "deposit",
-      "discriminator": [
-        242,
-        35,
-        198,
-        137,
-        82,
-        225,
-        242,
-        182
-      ],
-      "accounts": [
-        {
-          "name": "owner",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "governance",
-          "writable": true
-        },
-        {
-          "name": "voter",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  111,
-                  116,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "owner_token_account",
-          "writable": true
-        },
-        {
-          "name": "vault",
-          "writable": true,
-          "relations": [
-            "governance"
-          ]
-        },
-        {
-          "name": "mint",
-          "relations": [
-            "governance"
-          ]
-        },
-        {
-          "name": "token_program"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
         }
       ]
     },
@@ -222,24 +133,7 @@
         },
         {
           "name": "pool",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "randomness"
@@ -280,86 +174,28 @@
         },
         {
           "name": "governance",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  111,
-                  118,
-                  101,
-                  114,
-                  110,
-                  97,
-                  110,
-                  99,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "hub_dao"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "pool",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "mint"
+          "name": "dao_token",
+          "docs": [
+            "The DAO's token on record at the hub (set_dao_token): a token model",
+            "needs one, as members stake it in the hub's pool."
+          ]
         },
         {
-          "name": "vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_program"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
+        {
+          "name": "epoch",
+          "type": "u32"
+        },
         {
           "name": "council",
           "type": {
@@ -379,8 +215,9 @@
     {
       "name": "join_pool",
       "docs": [
-        "Joins the draw pool. Needs `eligibility_threshold` deposited; not",
-        "while a draw is under way."
+        "Joins the draw pool. Needs `eligibility_threshold` unlocked in the",
+        "DAO's current stake pool, which is locked there for this governance",
+        "while the member stays in; not while a draw is under way."
       ],
       "discriminator": [
         14,
@@ -395,57 +232,45 @@
       "accounts": [
         {
           "name": "owner",
+          "writable": true,
           "signer": true
         },
         {
           "name": "governance"
         },
         {
+          "name": "hub_dao"
+        },
+        {
           "name": "pool",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "voter",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  111,
-                  116,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
+          "writable": true
+        },
+        {
+          "name": "dao_token"
+        },
+        {
+          "name": "stake_pool",
+          "docs": [
+            "The DAO's current stake pool."
+          ]
+        },
+        {
+          "name": "stake",
+          "writable": true
+        },
+        {
+          "name": "lock",
+          "writable": true
+        },
+        {
+          "name": "stake_program"
+        },
+        {
+          "name": "system_program"
         }
       ],
       "args": []
@@ -453,8 +278,9 @@
     {
       "name": "leave_pool",
       "docs": [
-        "Leaves the draw pool (a council seat already held is kept). Not",
-        "while a draw is under way."
+        "Leaves the draw pool (a council seat already held is kept) and",
+        "unlocks the stake it held. Not while a draw is under way. Works after",
+        "the DAO has switched away from this governance."
       ],
       "discriminator": [
         249,
@@ -476,50 +302,26 @@
         },
         {
           "name": "pool",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "voter",
+          "writable": true
+        },
+        {
+          "name": "stake",
+          "writable": true
+        },
+        {
+          "name": "lock",
+          "docs": [
+            "The lock this governance holds on that stake (none when the threshold was 0)."
+          ],
           "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  111,
-                  116,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
+          "optional": true
+        },
+        {
+          "name": "stake_program"
         }
       ],
       "args": []
@@ -550,43 +352,14 @@
           "writable": true
         },
         {
-          "name": "hub_dao",
-          "relations": [
-            "governance"
-          ]
+          "name": "hub_dao"
         },
         {
           "name": "proposal",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  114,
-                  111,
-                  112,
-                  111,
-                  115,
-                  97,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -627,10 +400,7 @@
       ],
       "accounts": [
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -664,24 +434,7 @@
           "writable": true
         },
         {
-          "name": "pool",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  111,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              }
-            ]
-          }
+          "name": "pool"
         },
         {
           "name": "randomness",
@@ -745,87 +498,22 @@
           }
         }
       ]
-    },
-    {
-      "name": "withdraw",
-      "docs": [
-        "Withdraws a deposit; members in the draw pool leave it first."
-      ],
-      "discriminator": [
-        183,
-        18,
-        70,
-        156,
-        148,
-        109,
-        161,
-        34
-      ],
-      "accounts": [
-        {
-          "name": "owner",
-          "signer": true
-        },
-        {
-          "name": "governance",
-          "writable": true
-        },
-        {
-          "name": "voter",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  111,
-                  116,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "owner_token_account",
-          "writable": true
-        },
-        {
-          "name": "vault",
-          "writable": true,
-          "relations": [
-            "governance"
-          ]
-        },
-        {
-          "name": "mint",
-          "relations": [
-            "governance"
-          ]
-        },
-        {
-          "name": "token_program"
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
-        }
-      ]
     }
   ],
   "accounts": [
+    {
+      "name": "DrawPool",
+      "discriminator": [
+        174,
+        73,
+        1,
+        31,
+        56,
+        138,
+        66,
+        152
+      ]
+    },
     {
       "name": "Governance",
       "discriminator": [
@@ -837,19 +525,6 @@
         217,
         47,
         49
-      ]
-    },
-    {
-      "name": "Pool",
-      "discriminator": [
-        241,
-        154,
-        109,
-        4,
-        17,
-        177,
-        109,
-        188
       ]
     },
     {
@@ -891,19 +566,6 @@
         19,
         198,
         194
-      ]
-    },
-    {
-      "name": "Deposited",
-      "discriminator": [
-        111,
-        141,
-        26,
-        45,
-        161,
-        35,
-        100,
-        57
       ]
     },
     {
@@ -1035,19 +697,6 @@
         225,
         213
       ]
-    },
-    {
-      "name": "Withdrawn",
-      "discriminator": [
-        20,
-        89,
-        223,
-        198,
-        194,
-        124,
-        219,
-        13
-      ]
     }
   ],
   "types": [
@@ -1067,6 +716,47 @@
                 "name": "SortitionConfig"
               }
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Council",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "signers",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "required",
+            "docs": [
+              "How many signers must confirm."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "tenure",
+            "docs": [
+              "Seconds after `seated_at` before the DAO can replace the signers",
+              "without their confirmation."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "seated_at",
+            "type": "i64"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Goes up with every change, so approvals given to an earlier council",
+              "don't count."
+            ],
+            "type": "u32"
           }
         ]
       }
@@ -1118,7 +808,7 @@
           {
             "name": "governance",
             "docs": [
-              "The DAO's account in that program: `[GOVERNANCE_SEED, dao]` there."
+              "The DAO's account in that program: `[GOVERNANCE_SEED, dao, epoch]` there."
             ],
             "type": "pubkey"
           },
@@ -1151,30 +841,58 @@
           {
             "name": "executor_bump",
             "type": "u8"
+          },
+          {
+            "name": "council",
+            "docs": [
+              "The security council, when on."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Council"
+                }
+              }
+            }
+          },
+          {
+            "name": "allowance_count",
+            "docs": [
+              "How many allowances this DAO has granted (the latest id)."
+            ],
+            "type": "u64"
           }
         ]
       }
     },
     {
-      "name": "Deposited",
+      "name": "DaoToken",
+      "docs": [
+        "The DAO's token: `[TOKEN_SEED, dao]`. Members stake in `pool`, the",
+        "only pool that takes new stake, and token-based governance reads voting",
+        "power from it."
+      ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "governance",
+            "name": "dao",
             "type": "pubkey"
           },
           {
-            "name": "owner",
+            "name": "mint",
             "type": "pubkey"
           },
           {
-            "name": "amount",
-            "type": "u64"
+            "name": "pool",
+            "docs": [
+              "vortex-stake's pool for `mint`."
+            ],
+            "type": "pubkey"
           },
           {
-            "name": "total",
-            "type": "u64"
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }
@@ -1201,6 +919,31 @@
           {
             "name": "term_ends_at",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DrawPool",
+      "docs": [
+        "Everyone who can be drawn."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "members",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }
@@ -1263,14 +1006,6 @@
             "type": "pubkey"
           },
           {
-            "name": "mint",
-            "type": "pubkey"
-          },
-          {
-            "name": "vault",
-            "type": "pubkey"
-          },
-          {
             "name": "config",
             "type": {
               "defined": {
@@ -1300,10 +1035,6 @@
             "type": "u64"
           },
           {
-            "name": "total_deposited",
-            "type": "u64"
-          },
-          {
             "name": "draw_count",
             "docs": [
               "Draws started so far (the current one's number while one is open)."
@@ -1329,6 +1060,13 @@
           {
             "name": "draw_started_at",
             "type": "i64"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "The hub epoch this setup is for (part of its address)."
+            ],
+            "type": "u32"
           },
           {
             "name": "bump",
@@ -1368,6 +1106,36 @@
       }
     },
     {
+      "name": "LockRecord",
+      "docs": [
+        "What one governance holds of one stake: `[LOCK_SEED, stake, governance]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake",
+            "type": "pubkey"
+          },
+          {
+            "name": "locker",
+            "docs": [
+              "The governance account that locked it, the only one that can unlock it."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "PendingSwitch",
       "type": {
         "kind": "struct",
@@ -1386,20 +1154,33 @@
     {
       "name": "Pool",
       "docs": [
-        "Everyone who can be drawn."
+        "A DAO's pool for one token: `[POOL_SEED, dao, mint]`."
       ],
       "type": {
         "kind": "struct",
         "fields": [
           {
-            "name": "governance",
+            "name": "dao",
             "type": "pubkey"
           },
           {
-            "name": "members",
-            "type": {
-              "vec": "pubkey"
-            }
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "total",
+            "docs": [
+              "Everything staked here (raw tokens)."
+            ],
+            "type": "u64"
           },
           {
             "name": "bump",
@@ -1732,6 +1513,51 @@
       }
     },
     {
+      "name": "Stake",
+      "docs": [
+        "One member's stake in a pool: `[STAKE_SEED, pool, owner]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Staked (raw tokens)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "locked",
+            "docs": [
+              "Held by `Lock`s, one per governance that locked some."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "locked_until",
+            "docs": [
+              "The whole stake stays until this time (the end of the latest vote",
+              "it was cast in)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "StoredAccountMeta",
       "docs": [
         "One account an instruction touches."
@@ -1849,43 +1675,26 @@
             "type": "pubkey"
           },
           {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
             "name": "eligible",
             "docs": [
-              "In the draw pool (deposit locked meanwhile)."
+              "In the draw pool (`locked` of their stake held meanwhile)."
             ],
             "type": "bool"
           },
           {
+            "name": "stake_pool",
+            "docs": [
+              "The stake pool that stake is in."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "locked",
+            "type": "u64"
+          },
+          {
             "name": "bump",
             "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Withdrawn",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "governance",
-            "type": "pubkey"
-          },
-          {
-            "name": "owner",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "total",
-            "type": "u64"
           }
         ]
       }

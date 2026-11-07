@@ -26,6 +26,7 @@ anchor-spl = { workspace = true }
 solana-sha256-hasher = "3.1.0"
 vortex-core = { path = "../../crates/vortex-core" }
 vortex-hub = { path = "../hub", features = ["cpi"] }
+vortex-stake = { path = "../stake", features = ["cpi"] }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

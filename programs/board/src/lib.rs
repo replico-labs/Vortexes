@@ -35,18 +35,16 @@ pub mod vortex_board {
     /// Sets up a hub DAO in this program: its signers and rules. The
     /// creator right after `vortex_hub::create_dao`, or the DAO's treasury
     /// (inside a passed proposal) when switching to this model.
-    pub fn init_governance(ctx: Context<InitGovernance>, signers: Vec<Pubkey>, config: BoardConfig) -> Result<()> {
+    pub fn init_governance(ctx: Context<InitGovernance>, epoch: u32, signers: Vec<Pubkey>, config: BoardConfig) -> Result<()> {
         validate_signers(&signers)?;
         config.validate(signers.len())?;
         let hub_dao = &ctx.accounts.hub_dao;
         let hub_dao_key = hub_dao.key();
-        let becoming_active = hub_dao.governance_program == crate::ID
-            || hub_dao.pending_switch.as_ref().is_some_and(|s| s.program == crate::ID);
-        require!(becoming_active, GovError::NotActiveGovernance);
         let treasury = vortex_hub::treasury_address(&hub_dao_key);
         let who = ctx.accounts.authority.key();
-        let first_setup = hub_dao.epoch == 1 && hub_dao.governance_program == crate::ID;
-        require!(who == treasury || (first_setup && who == hub_dao.creator), GovError::Unauthorized);
+        // Epoch 1 by the creator for the DAO's first governance; the next
+        // epoch by the treasury (a passed proposal) for a pending switch here.
+        hub_dao.check_setup(&hub_dao_key, &crate::ID, &who, epoch)?;
 
         let g = &mut ctx.accounts.governance;
         g.hub_dao = hub_dao_key;
@@ -55,6 +53,7 @@ pub mod vortex_board {
         g.signers = signers;
         g.config = config;
         g.proposal_count = 0;
+        g.epoch = epoch;
         g.bump = ctx.bumps.governance;
         emit!(GovernanceInitialized { hub_dao: hub_dao_key, governance: g.key(), signers: g.signers.clone(), required_approvals: config.required_approvals });
         Ok(())
@@ -255,6 +254,8 @@ pub struct Governance {
     pub signers: Vec<Pubkey>,
     pub config: BoardConfig,
     pub proposal_count: u64,
+    /// The hub epoch this setup is for (part of its address).
+    pub epoch: u32,
     pub bump: u8,
 }
 
@@ -337,12 +338,13 @@ impl Proposal {
 // ---------------------------------------------------------------
 
 #[derive(Accounts)]
+#[instruction(epoch: u32)]
 pub struct InitGovernance<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
     pub hub_dao: Account<'info, HubDao>,
-    #[account(init, payer = payer, space = 8 + Governance::INIT_SPACE, seeds = [GOVERNANCE_SEED, hub_dao.key().as_ref()], bump)]
+    #[account(init, payer = payer, space = 8 + Governance::INIT_SPACE, seeds = [GOVERNANCE_SEED, hub_dao.key().as_ref(), &epoch.to_le_bytes()], bump)]
     pub governance: Account<'info, Governance>,
     pub system_program: Program<'info, System>,
 }

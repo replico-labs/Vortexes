@@ -30,10 +30,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -64,10 +61,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -98,10 +92,7 @@
       ],
       "accounts": [
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -142,91 +133,28 @@
         },
         {
           "name": "governance",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  111,
-                  118,
-                  101,
-                  114,
-                  110,
-                  97,
-                  110,
-                  99,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "hub_dao"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "base_mint"
+        },
+        {
+          "name": "dao_token",
+          "docs": [
+            "The DAO's token on record at the hub (set_dao_token): setting up -",
+            "a switch included - only works with that mint."
+          ]
         },
         {
           "name": "quote_mint"
         },
         {
           "name": "base_vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  98,
-                  97,
-                  115,
-                  101,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "quote_vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  113,
-                  117,
-                  111,
-                  116,
-                  101,
-                  95,
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "base_token_program"
@@ -235,11 +163,14 @@
           "name": "quote_token_program"
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
+        {
+          "name": "epoch",
+          "type": "u32"
+        },
         {
           "name": "config",
           "type": {
@@ -271,10 +202,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -282,32 +210,7 @@
         },
         {
           "name": "position",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  115,
-                  105,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "proposal"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "owner_base",
@@ -325,29 +228,17 @@
             },
             {
               "name": "base_vault",
-              "writable": true,
-              "relations": [
-                "governance"
-              ]
+              "writable": true
             },
             {
               "name": "quote_vault",
-              "writable": true,
-              "relations": [
-                "governance"
-              ]
+              "writable": true
             },
             {
-              "name": "base_mint",
-              "relations": [
-                "governance"
-              ]
+              "name": "base_mint"
             },
             {
-              "name": "quote_mint",
-              "relations": [
-                "governance"
-              ]
+              "name": "quote_mint"
             },
             {
               "name": "base_token_program"
@@ -397,39 +288,17 @@
           "writable": true
         },
         {
-          "name": "hub_dao",
-          "relations": [
-            "governance"
+          "name": "hub_dao"
+        },
+        {
+          "name": "dao_token",
+          "docs": [
+            "New proposals use the DAO's token on record: sync first after a change."
           ]
         },
         {
           "name": "proposal",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  114,
-                  111,
-                  112,
-                  111,
-                  115,
-                  97,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "proposer_base",
@@ -447,29 +316,17 @@
             },
             {
               "name": "base_vault",
-              "writable": true,
-              "relations": [
-                "governance"
-              ]
+              "writable": true
             },
             {
               "name": "quote_vault",
-              "writable": true,
-              "relations": [
-                "governance"
-              ]
+              "writable": true
             },
             {
-              "name": "base_mint",
-              "relations": [
-                "governance"
-              ]
+              "name": "base_mint"
             },
             {
-              "name": "quote_mint",
-              "relations": [
-                "governance"
-              ]
+              "name": "quote_mint"
             },
             {
               "name": "base_token_program"
@@ -480,8 +337,7 @@
           ]
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -532,16 +388,10 @@
       "accounts": [
         {
           "name": "proposer",
-          "signer": true,
-          "relations": [
-            "proposal"
-          ]
+          "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -563,29 +413,17 @@
             },
             {
               "name": "base_vault",
-              "writable": true,
-              "relations": [
-                "governance"
-              ]
+              "writable": true
             },
             {
               "name": "quote_vault",
-              "writable": true,
-              "relations": [
-                "governance"
-              ]
+              "writable": true
             },
             {
-              "name": "base_mint",
-              "relations": [
-                "governance"
-              ]
+              "name": "base_mint"
             },
             {
-              "name": "quote_mint",
-              "relations": [
-                "governance"
-              ]
+              "name": "quote_mint"
             },
             {
               "name": "base_token_program"
@@ -620,10 +458,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -631,32 +466,7 @@
         },
         {
           "name": "position",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  115,
-                  105,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "proposal"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "owner_base",
@@ -674,29 +484,17 @@
             },
             {
               "name": "base_vault",
-              "writable": true,
-              "relations": [
-                "governance"
-              ]
+              "writable": true
             },
             {
               "name": "quote_vault",
-              "writable": true,
-              "relations": [
-                "governance"
-              ]
+              "writable": true
             },
             {
-              "name": "base_mint",
-              "relations": [
-                "governance"
-              ]
+              "name": "base_mint"
             },
             {
-              "name": "quote_mint",
-              "relations": [
-                "governance"
-              ]
+              "name": "quote_mint"
             },
             {
               "name": "base_token_program"
@@ -737,32 +535,7 @@
         },
         {
           "name": "position",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  115,
-                  105,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "proposal"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "owner_base",
@@ -780,29 +553,17 @@
             },
             {
               "name": "base_vault",
-              "writable": true,
-              "relations": [
-                "governance"
-              ]
+              "writable": true
             },
             {
               "name": "quote_vault",
-              "writable": true,
-              "relations": [
-                "governance"
-              ]
+              "writable": true
             },
             {
-              "name": "base_mint",
-              "relations": [
-                "governance"
-              ]
+              "name": "base_mint"
             },
             {
-              "name": "quote_mint",
-              "relations": [
-                "governance"
-              ]
+              "name": "quote_mint"
             },
             {
               "name": "base_token_program"
@@ -813,8 +574,7 @@
           ]
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -827,6 +587,58 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "sync_base_token",
+      "docs": [
+        "After the DAO changed its token (the hub's record), moves new",
+        "proposals onto it: opens the base vault for the new token. Anyone.",
+        "Open proposals keep the token and vault they were made with."
+      ],
+      "discriminator": [
+        96,
+        28,
+        145,
+        178,
+        76,
+        77,
+        174,
+        173
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        },
+        {
+          "name": "hub_dao"
+        },
+        {
+          "name": "dao_token"
+        },
+        {
+          "name": "base_mint",
+          "docs": [
+            "The DAO's token on record now."
+          ]
+        },
+        {
+          "name": "base_vault",
+          "writable": true
+        },
+        {
+          "name": "base_token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
     },
     {
       "name": "trade",
@@ -855,32 +667,7 @@
         },
         {
           "name": "position",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  111,
-                  115,
-                  105,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "proposal"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": [
@@ -989,6 +776,19 @@
     }
   ],
   "events": [
+    {
+      "name": "BaseTokenSynced",
+      "discriminator": [
+        169,
+        120,
+        209,
+        44,
+        140,
+        169,
+        186,
+        63
+      ]
+    },
     {
       "name": "ConfigUpdated",
       "discriminator": [
@@ -1135,6 +935,26 @@
   ],
   "types": [
     {
+      "name": "BaseTokenSynced",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "base_mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
       "name": "ConfigUpdated",
       "type": {
         "kind": "struct",
@@ -1150,6 +970,47 @@
                 "name": "MarketsConfig"
               }
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Council",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "signers",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "required",
+            "docs": [
+              "How many signers must confirm."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "tenure",
+            "docs": [
+              "Seconds after `seated_at` before the DAO can replace the signers",
+              "without their confirmation."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "seated_at",
+            "type": "i64"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Goes up with every change, so approvals given to an earlier council",
+              "don't count."
+            ],
+            "type": "u32"
           }
         ]
       }
@@ -1181,7 +1042,7 @@
           {
             "name": "governance",
             "docs": [
-              "The DAO's account in that program: `[GOVERNANCE_SEED, dao]` there."
+              "The DAO's account in that program: `[GOVERNANCE_SEED, dao, epoch]` there."
             ],
             "type": "pubkey"
           },
@@ -1214,6 +1075,58 @@
           {
             "name": "executor_bump",
             "type": "u8"
+          },
+          {
+            "name": "council",
+            "docs": [
+              "The security council, when on."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Council"
+                }
+              }
+            }
+          },
+          {
+            "name": "allowance_count",
+            "docs": [
+              "How many allowances this DAO has granted (the latest id)."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DaoToken",
+      "docs": [
+        "The DAO's token: `[TOKEN_SEED, dao]`. Members stake in `pool`, the",
+        "only pool that takes new stake, and token-based governance reads voting",
+        "power from it."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "docs": [
+              "vortex-stake's pool for `mint`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }
@@ -1238,7 +1151,8 @@
           {
             "name": "base_mint",
             "docs": [
-              "The DAO's token."
+              "The DAO's token for new proposals (follows the hub's record through",
+              "`sync_base_token`)."
             ],
             "type": "pubkey"
           },
@@ -1268,6 +1182,13 @@
           {
             "name": "proposal_count",
             "type": "u64"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "The hub epoch this setup is for (part of its address)."
+            ],
+            "type": "u32"
           },
           {
             "name": "bump",
@@ -1498,6 +1419,18 @@
           {
             "name": "metadata_uri",
             "type": "string"
+          },
+          {
+            "name": "base_mint",
+            "docs": [
+              "The DAO's token and its base vault when proposed: this proposal's",
+              "markets settle in them, even after a token change."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "base_vault",
+            "type": "pubkey"
           },
           {
             "name": "created_at",

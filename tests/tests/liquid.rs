@@ -36,53 +36,32 @@ fn tally(env: &Env, p: Pubkey) -> (u64, u64, u64) {
     (t.for_votes, t.against_votes, t.abstain_votes)
 }
 
-fn deposit(env: &mut Env, m: &Member, amount: u64, delegate: Option<&Pubkey>) -> Result<(), FailedTransactionMetadata> {
-    let ix = Instruction {
-        program_id: LIQ,
-        accounts: liq::accounts::Deposit {
-            owner: m.kp.pubkey(),
-            governance: env.governance(LIQ),
-            voter: env.voter_pda(LIQ, &m.kp.pubkey()),
-            delegate_voter: delegate.map(|d| env.voter_pda(LIQ, d)),
-            owner_token_account: m.ata,
-            vault: env.vault(LIQ),
-            mint: env.mint,
-            token_program: env.token_program,
-            system_program: SYSTEM,
-        }
-        .to_account_metas(None),
-        data: liq::instruction::Deposit { amount }.data(),
-    };
-    env.send(&[ix], &[&m.kp])
+/// Stakes in the DAO's pool. (Delegations no longer follow later stake: the
+/// delegate argument is kept so call sites read as before.)
+fn deposit(env: &mut Env, m: &Member, amount: u64, _delegate: Option<&Pubkey>) -> Result<(), FailedTransactionMetadata> {
+    env.deposit(LIQ, m, amount)
 }
 
-fn withdraw(env: &mut Env, m: &Member, amount: u64, delegate: Option<&Pubkey>) -> Result<(), FailedTransactionMetadata> {
-    let ix = Instruction {
-        program_id: LIQ,
-        accounts: liq::accounts::Withdraw {
-            owner: m.kp.pubkey(),
-            governance: env.governance(LIQ),
-            voter: env.voter_pda(LIQ, &m.kp.pubkey()),
-            delegate_voter: delegate.map(|d| env.voter_pda(LIQ, d)),
-            owner_token_account: m.ata,
-            vault: env.vault(LIQ),
-            mint: env.mint,
-            token_program: env.token_program,
-        }
-        .to_account_metas(None),
-        data: liq::instruction::Withdraw { amount }.data(),
-    };
-    env.send(&[ix], &[&m.kp])
+fn withdraw(env: &mut Env, m: &Member, amount: u64, _delegate: Option<&Pubkey>) -> Result<(), FailedTransactionMetadata> {
+    env.withdraw(LIQ, m, amount)
 }
 
 fn delegate(env: &mut Env, m: &Member, to: &Pubkey) -> Result<(), FailedTransactionMetadata> {
+    let owner = m.kp.pubkey();
+    let pool = env.pool();
     let ix = Instruction {
         program_id: LIQ,
         accounts: liq::accounts::Delegate {
-            owner: m.kp.pubkey(),
+            owner,
             governance: env.governance(LIQ),
-            voter: env.voter_pda(LIQ, &m.kp.pubkey()),
+            hub_dao: env.dao,
+            dao_token: hub::dao_token_address(&env.dao),
+            pool,
+            stake: Env::stake_pda(&pool, &owner),
+            lock: Env::lock_pda(&pool, &owner, &env.governance(LIQ)),
+            voter: env.voter_pda(LIQ, &owner),
             delegate_voter: env.voter_pda(LIQ, to),
+            stake_program: STAKE,
             system_program: SYSTEM,
         }
         .to_account_metas(None),
@@ -92,13 +71,18 @@ fn delegate(env: &mut Env, m: &Member, to: &Pubkey) -> Result<(), FailedTransact
 }
 
 fn undelegate(env: &mut Env, m: &Member, to: &Pubkey) -> Result<(), FailedTransactionMetadata> {
+    let owner = m.kp.pubkey();
+    let pool = voter(env, &owner).pool;
     let ix = Instruction {
         program_id: LIQ,
         accounts: liq::accounts::Undelegate {
-            owner: m.kp.pubkey(),
+            owner,
             governance: env.governance(LIQ),
-            voter: env.voter_pda(LIQ, &m.kp.pubkey()),
+            voter: env.voter_pda(LIQ, &owner),
             delegate_voter: env.voter_pda(LIQ, to),
+            stake: Env::stake_pda(&pool, &owner),
+            lock: Env::lock_pda(&pool, &owner, &env.governance(LIQ)),
+            stake_program: STAKE,
         }
         .to_account_metas(None),
         data: liq::instruction::Undelegate {}.data(),
@@ -117,10 +101,14 @@ fn vote(env: &mut Env, m: &Member, p: Pubkey, choice: Choice) -> Result<(), Fail
         accounts: liq::accounts::CastVote {
             owner,
             governance: env.governance(LIQ),
+            hub_dao: env.dao,
             proposal: p,
+            pool: proposal(env, p).pool,
+            stake: Env::stake_pda(&proposal(env, p).pool, &owner),
             voter: env.voter_pda(LIQ, &owner),
             overrides: override_pda(&p, &owner),
             vote_record: env.vote_pda(LIQ, &p, &owner),
+            stake_program: STAKE,
             system_program: SYSTEM,
         }
         .to_account_metas(None),
@@ -136,7 +124,11 @@ fn override_vote(env: &mut Env, m: &Member, delegate: &Pubkey, p: Pubkey, choice
         accounts: liq::accounts::OverrideVote {
             owner,
             governance: env.governance(LIQ),
+            hub_dao: env.dao,
             proposal: p,
+            pool: proposal(env, p).pool,
+            stake: Env::stake_pda(&proposal(env, p).pool, &owner),
+            stake_program: STAKE,
             voter: env.voter_pda(LIQ, &owner),
             delegate_voter: env.voter_pda(LIQ, delegate),
             delegate_record: env.vote_pda(LIQ, &p, delegate),
@@ -155,13 +147,19 @@ fn propose(env: &mut Env, m: &Member) -> Result<Pubkey, FailedTransactionMetadat
     let data = env.svm.get_account(&g).unwrap().data;
     let id = liq::Governance::try_deserialize(&mut &data[..]).unwrap().proposal_count + 1;
     let p = env.proposal_pda(LIQ, id);
+    let pool = env.pool();
+    let voter = env.voter_pda(LIQ, &m.kp.pubkey());
+    let has_voter = env.svm.get_account(&voter).is_some();
     let ix = Instruction {
         program_id: LIQ,
         accounts: liq::accounts::Propose {
             proposer: m.kp.pubkey(),
             governance: g,
             hub_dao: env.dao,
-            voter: Some(env.voter_pda(LIQ, &m.kp.pubkey())),
+            dao_token: hub::dao_token_address(&env.dao),
+            pool,
+            proposer_stake: Some(Env::stake_pda(&pool, &m.kp.pubkey())),
+            voter: has_voter.then_some(voter),
             proposal: p,
             system_program: SYSTEM,
         }
@@ -217,14 +215,14 @@ fn overriding_after_the_delegate_voted_moves_the_weight() {
     assert!(override_vote(&mut env, &carol, &a, p, Choice::For).is_err(), "one vote each");
     assert_eq!(code(vote(&mut env, &bob, p, Choice::Against)), err(GovError::AlreadyDelegated), "delegators vote by overriding");
 
-    // Bob's tokens were counted in alice's open vote: locked until it closes.
+    // Bob's tokens were counted in alice's open vote: he can't take them back until it closes,
+    // and while delegated they're locked in the pool.
     assert_eq!(code(undelegate(&mut env, &bob, &a)), err(GovError::DelegationLocked));
-    assert_eq!(code(withdraw(&mut env, &bob, 10, Some(&a))), err(GovError::DelegationLocked));
-    assert_eq!(code(deposit(&mut env, &bob, 10, Some(&a))), err(GovError::DelegationLocked));
-    assert_eq!(code(withdraw(&mut env, &bob, 10, None)), err(GovError::WrongDelegate), "the delegate's account must come along");
+    assert_eq!(code(withdraw(&mut env, &bob, 10, Some(&a))), err(GovError::InsufficientDeposit));
     env.warp(START + 110);
     undelegate(&mut env, &bob, &a).unwrap();
     assert_eq!(voter(&env, &a).delegated_power, 200);
+    assert_eq!(env.voter_account(LIQ, &bob.kp.pubkey()).locked, 0, "the pool lock is released");
     withdraw(&mut env, &bob, 300, None).unwrap();
 }
 
@@ -300,15 +298,21 @@ fn delegated_tokens_count_toward_the_proposal_threshold() {
 }
 
 #[test]
-fn deposits_and_withdrawals_keep_the_delegates_total_in_step() {
+fn delegated_stake_stays_locked_and_new_stake_isnt_delegated() {
     let (mut env, [alice, bob, _carol, _dave]) = liquid_dao();
     let a = alice.kp.pubkey();
     delegate(&mut env, &bob, &a).unwrap();
-    deposit(&mut env, &bob, 100, Some(&a)).unwrap();
-    assert_eq!(voter(&env, &a).delegated_power, 400);
-    withdraw(&mut env, &bob, 250, Some(&a)).unwrap();
-    assert_eq!(voter(&env, &a).delegated_power, 150);
-    assert_eq!(code(deposit(&mut env, &bob, 1, Some(&_carol.kp.pubkey()))), err(GovError::WrongDelegate), "someone else's account as the delegate");
+    assert_eq!(env.voter_account(LIQ, &bob.kp.pubkey()).locked, 300, "bob's 300 is locked in the pool for liquid");
+    // More stake isn't delegated until bob delegates again, and stays his to take out.
+    deposit(&mut env, &bob, 100, None).unwrap();
+    assert_eq!(voter(&env, &a).delegated_power, 300);
+    assert_eq!(code(withdraw(&mut env, &bob, 101, None)), err(GovError::InsufficientDeposit));
+    withdraw(&mut env, &bob, 100, None).unwrap();
+    // Undelegating unlocks it; delegating again hands over all of it.
+    undelegate(&mut env, &bob, &a).unwrap();
+    deposit(&mut env, &bob, 50, None).unwrap();
+    delegate(&mut env, &bob, &a).unwrap();
+    assert_eq!(voter(&env, &a).delegated_power, 350);
 }
 
 #[test]
@@ -322,11 +326,8 @@ fn a_token_weighted_dao_can_switch_to_liquid() {
     env.apply_switch(LIQ).unwrap();
     assert_eq!(env.hub_dao().governance_program, LIQ);
 
-    // Members move their tokens over and delegate; the same treasury pays out.
-    env.withdraw(TW, &alice, 600).unwrap();
-    env.withdraw(TW, &bob, 400).unwrap();
-    deposit(&mut env, &alice, 600, None).unwrap();
-    deposit(&mut env, &bob, 400, None).unwrap();
+    // Stake stays in the pool through the switch: members just delegate; the same treasury pays out.
+    assert_eq!(env.voter_account(LIQ, &alice.kp.pubkey()).amount, 600);
     delegate(&mut env, &bob, &alice.kp.pubkey()).unwrap();
     let p = propose(&mut env, &alice).unwrap();
     let prop = proposal(&env, p);

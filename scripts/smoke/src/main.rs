@@ -1,8 +1,9 @@
 //! Smoke test for a live cluster (devnet, or a local validator).
 //!
 //! `run`: sets up the hub (first time only), then for each model creates a
-//! DAO, funds its treasury and pushes one proposal through that pays a
-//! little SOL, checking the payment landed. It also starts a switch of the
+//! DAO (with its stake pool in vortex-stake), funds its treasury and pushes
+//! one proposal through that pays a little SOL, checking the payment
+//! landed. Members stake in the DAO's pool, which every token model reads. It also starts a switch of the
 //! token-weighted DAO to board, which can only finish after the hub's 2-day
 //! delay.
 //!
@@ -54,6 +55,7 @@ const PAYMENT: u64 = 2_000_000;
 const TREASURY_FUNDING: u64 = 50_000_000;
 const MEMBER_FUNDING: u64 = 60_000_000;
 const SYSTEM: Pubkey = anchor_lang::system_program::ID;
+const STAKE: Pubkey = vortex_stake::ID;
 
 const TW: Pubkey = vortex_token_weighted::ID;
 const QV: Pubkey = vortex_quadratic::ID;
@@ -123,14 +125,28 @@ struct Dao {
     dao: Pubkey,
     treasury: Pubkey,
     mint: Pubkey,
+    /// The hub epoch the flow works in: 1, or 2 after the switch.
+    epoch: u32,
 }
 
 impl Dao {
+    /// The DAO's account in `gp` for the flow's epoch.
     fn governance(&self, gp: Pubkey) -> Pubkey {
-        Pubkey::find_program_address(&[GOVERNANCE_SEED, self.dao.as_ref()], &gp).0
+        Pubkey::find_program_address(&[GOVERNANCE_SEED, self.dao.as_ref(), &self.epoch.to_le_bytes()], &gp).0
     }
-    fn vault(&self, gp: Pubkey) -> Pubkey {
-        Pubkey::find_program_address(&[b"vault", self.governance(gp).as_ref()], &gp).0
+    /// The DAO's stake pool for its token (vortex-stake).
+    fn pool(&self) -> Pubkey {
+        vortex_core::pool_address(&self.dao, &self.mint)
+    }
+    fn pool_vault(&self) -> Pubkey {
+        Pubkey::find_program_address(&[vortex_stake::VAULT_SEED, self.pool().as_ref()], &STAKE).0
+    }
+    fn stake(&self, owner: &Pubkey) -> Pubkey {
+        vortex_core::stake_address(&self.pool(), owner)
+    }
+    /// vortex-stake's record of what `gp`'s governance locked of `owner`'s stake.
+    fn lock(&self, gp: Pubkey, owner: &Pubkey) -> Pubkey {
+        Pubkey::find_program_address(&[vortex_stake::LOCK_SEED, self.stake(owner).as_ref(), self.governance(gp).as_ref()], &STAKE).0
     }
     fn voter(&self, gp: Pubkey, owner: &Pubkey) -> Pubkey {
         Pubkey::find_program_address(&[b"voter", self.governance(gp).as_ref(), owner.as_ref()], &gp).0
@@ -170,7 +186,7 @@ impl Smoke {
 
         for (gp, name) in deployed {
             println!("== {name}");
-            // Each DAO keeps its deposits, so top the members up first.
+            // Each DAO has its own pool, so top the members up first.
             self.mint_to(mint, &[&alice, &bob]);
             let result = match gp {
                 g if g == TW || g == QV => self.voting_flow(gp, mint, &alice, &bob),
@@ -277,9 +293,12 @@ impl Smoke {
                 accounts: vortex_token_weighted::accounts::CastVote {
                     owner: alice.kp.pubkey(),
                     governance: dao.governance(gp),
+                    hub_dao: dao.dao,
                     proposal: p,
-                    voter: dao.voter(gp, &alice.kp.pubkey()),
+                    pool: dao.pool(),
+                    stake: dao.stake(&alice.kp.pubkey()),
                     vote_record: Pubkey::find_program_address(&[b"vote", p.as_ref(), alice.kp.pubkey().as_ref()], &gp).0,
+                    stake_program: STAKE,
                     system_program: SYSTEM,
                 }
                 .to_account_metas(None),
@@ -313,15 +332,11 @@ impl Smoke {
                 payer: *me,
                 hub_dao: d.dao,
                 governance: d.governance(OPT),
-                mint: d.mint,
                 dao_token: hub::dao_token_address(&d.dao),
-                vault: d.vault(OPT),
-                bond_vault: Pubkey::find_program_address(&[vortex_optimistic::BOND_VAULT_SEED, d.governance(OPT).as_ref()], &OPT).0,
-                token_program: spl_token_interface::ID,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
-            data: vortex_optimistic::instruction::InitGovernance { config }.data(),
+            data: vortex_optimistic::instruction::InitGovernance { epoch: d.epoch, config }.data(),
         })?;
         self.deposit(&dao, OPT, alice, 600)?;
         let to = Keypair::new().pubkey();
@@ -366,12 +381,11 @@ impl Smoke {
                 governance: d.governance(CONV),
                 mint: d.mint,
                 dao_token: hub::dao_token_address(&d.dao),
-                vault: d.vault(CONV),
                 token_program: spl_token_interface::ID,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
-            data: conv::instruction::InitGovernance { config, sol_weight: 100, token_weight: 100 }.data(),
+            data: conv::instruction::InitGovernance { epoch: d.epoch, config, sol_weight: 100, token_weight: 100 }.data(),
         })?;
         self.deposit(&dao, CONV, alice, 600)?;
         let to = Keypair::new().pubkey();
@@ -380,7 +394,9 @@ impl Smoke {
             proposer: alice.kp.pubkey(),
             governance: dao.governance(CONV),
             hub_dao: dao.dao,
-            voter: Some(dao.voter(CONV, &alice.kp.pubkey())),
+            dao_token: hub::dao_token_address(&dao.dao),
+            pool: dao.pool(),
+            proposer_stake: Some(dao.stake(&alice.kp.pubkey())),
             proposal: p,
             system_program: SYSTEM,
         }
@@ -396,9 +412,15 @@ impl Smoke {
                 accounts: conv::accounts::Support {
                     owner: alice.kp.pubkey(),
                     governance: dao.governance(CONV),
+                    hub_dao: dao.dao,
                     voter: dao.voter(CONV, &alice.kp.pubkey()),
                     proposal: p,
                     previous: None,
+                    pool: dao.pool(),
+                    stake: dao.stake(&alice.kp.pubkey()),
+                    lock: dao.lock(CONV, &alice.kp.pubkey()),
+                    stake_program: STAKE,
+                    system_program: SYSTEM,
                 }
                 .to_account_metas(None),
                 data: conv::instruction::Support {}.data(),
@@ -441,14 +463,11 @@ impl Smoke {
                 payer: *me,
                 hub_dao: d.dao,
                 governance: d.governance(DEL),
-                mint: d.mint,
                 dao_token: hub::dao_token_address(&d.dao),
-                vault: d.vault(DEL),
-                token_program: spl_token_interface::ID,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
-            data: del::instruction::InitGovernance { council, config }.data(),
+            data: del::instruction::InitGovernance { epoch: d.epoch, council, config }.data(),
         })?;
         let to = Keypair::new().pubkey();
         let p = dao.proposal(DEL, 1);
@@ -493,7 +512,8 @@ impl Smoke {
         let dao = self.create_dao(mint, TW, "Smoke switch", |d, me| ix_init_voting(d, TW, me, config))?;
         self.deposit(&dao, TW, alice, 600)?;
         let board = vortex_board::BoardConfig { required_approvals: 2, timelock: 5, execution_period: 3_600 };
-        let init_board = stored(ix_init_board(&dao, &dao.treasury, vec![alice.kp.pubkey(), bob.kp.pubkey()], board));
+        // The board is set up for the epoch the switch will start.
+        let init_board = stored(ix_init_board(&Dao { epoch: dao.epoch + 1, ..dao }, &dao.treasury, vec![alice.kp.pubkey(), bob.kp.pubkey()], board));
         let propose_switch = stored(Instruction {
             program_id: hub::ID,
             accounts: hub::accounts::ProposeSwitch { treasury: dao.treasury, dao: dao.dao, model: model_pda(&BOARD) }.to_account_metas(None),
@@ -508,9 +528,12 @@ impl Smoke {
                 accounts: vortex_token_weighted::accounts::CastVote {
                     owner: alice.kp.pubkey(),
                     governance: dao.governance(TW),
+                    hub_dao: dao.dao,
                     proposal: p,
-                    voter: dao.voter(TW, &alice.kp.pubkey()),
+                    pool: dao.pool(),
+                    stake: dao.stake(&alice.kp.pubkey()),
                     vote_record: Pubkey::find_program_address(&[b"vote", p.as_ref(), alice.kp.pubkey().as_ref()], &TW).0,
+                    stake_program: STAKE,
                     system_program: SYSTEM,
                 }
                 .to_account_metas(None),
@@ -543,7 +566,8 @@ impl Smoke {
         let mint: Pubkey = lines.next().unwrap().parse().unwrap();
         let alice = read_keypair_file(dir.join("alice.json")).unwrap();
         let bob = read_keypair_file(dir.join("bob.json")).unwrap();
-        let dao = Dao { dao: dao_key, treasury: hub::treasury_address(&dao_key), mint };
+        // The switch made epoch 2: the board's account is the one for it.
+        let dao = Dao { dao: dao_key, treasury: hub::treasury_address(&dao_key), mint, epoch: 2 };
         let result = (|| {
             let record = read::<hub::Dao>(&self.rpc, &dao.dao);
             if record.governance_program != BOARD {
@@ -582,7 +606,7 @@ impl Smoke {
     fn create_dao(&mut self, mint: Pubkey, gp: Pubkey, name: &str, init: impl FnOnce(&Dao, &Pubkey) -> Instruction) -> Result<Dao, String> {
         let create_key = Keypair::new();
         let dao_key = Pubkey::find_program_address(&[hub::DAO_SEED, create_key.pubkey().as_ref()], &hub::ID).0;
-        let dao = Dao { dao: dao_key, treasury: hub::treasury_address(&dao_key), mint };
+        let dao = Dao { dao: dao_key, treasury: hub::treasury_address(&dao_key), mint, epoch: 1 };
         let create = Instruction {
             program_id: hub::ID,
             accounts: hub::accounts::CreateDao { creator: self.payer.pubkey(), create_key: create_key.pubkey(), model: model_pda(&gp), dao: dao_key, system_program: SYSTEM }
@@ -603,30 +627,48 @@ impl Smoke {
             .to_account_metas(None),
             data: hub::instruction::SetDaoToken { mint }.data(),
         };
+        // Its stake pool (anyone can open one; this wallet pays).
+        let pool = Instruction {
+            program_id: STAKE,
+            accounts: vortex_stake::accounts::CreatePool {
+                payer: self.payer.pubkey(),
+                hub_dao: dao_key,
+                mint,
+                pool: dao.pool(),
+                vault: dao.pool_vault(),
+                token_program: spl_token_interface::ID,
+                system_program: SYSTEM,
+            }
+            .to_account_metas(None),
+            data: vortex_stake::instruction::CreatePool {}.data(),
+        };
         let init = init(&dao, &self.payer.pubkey());
         let fund = solana_system_interface::instruction::transfer(&self.payer.pubkey(), &dao.treasury, TREASURY_FUNDING);
-        let sig = self.send(&[create, record, init, fund], &[&create_key]).map_err(|e| format!("create DAO: {e}"))?;
+        let sig = self.send(&[create, record, pool, init, fund], &[&create_key]).map_err(|e| format!("create DAO: {e}"))?;
         println!("  DAO {dao_key} created, treasury {} funded ({sig})", dao.treasury);
         Ok(dao)
     }
 
-    fn deposit(&mut self, dao: &Dao, gp: Pubkey, m: &Member, amount: u64) -> Result<(), String> {
+    /// Stakes `amount` in the DAO's pool (every token model reads it; `_gp`
+    /// is kept so the flows read as before).
+    fn deposit(&mut self, dao: &Dao, _gp: Pubkey, m: &Member, amount: u64) -> Result<(), String> {
         let ix = Instruction {
-            program_id: gp,
-            accounts: vortex_token_weighted::accounts::Deposit {
+            program_id: STAKE,
+            accounts: vortex_stake::accounts::StakeTokens {
                 owner: m.kp.pubkey(),
-                governance: dao.governance(gp),
-                voter: dao.voter(gp, &m.kp.pubkey()),
+                pool: dao.pool(),
+                dao_token: hub::dao_token_address(&dao.dao),
+                stake: dao.stake(&m.kp.pubkey()),
                 owner_token_account: m.ata,
-                vault: dao.vault(gp),
+                vault: dao.pool_vault(),
                 mint: dao.mint,
                 token_program: spl_token_interface::ID,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
-            data: vortex_token_weighted::instruction::Deposit { amount }.data(),
+            data: vortex_stake::instruction::Stake { amount }.data(),
         };
-        self.send_ix(ix, &[&m.kp], "deposit").map(|_| ())
+        self.send_ix(ix, &[&m.kp], "stake").map(|_| ())
     }
 
     /// Proposal 1 in a token-weighted, quadratic or optimistic DAO (same
@@ -639,7 +681,9 @@ impl Smoke {
                 proposer: m.kp.pubkey(),
                 governance: dao.governance(gp),
                 hub_dao: dao.dao,
-                voter: Some(dao.voter(gp, &m.kp.pubkey())),
+                dao_token: hub::dao_token_address(&dao.dao),
+                pool: dao.pool(),
+                proposer_stake: Some(dao.stake(&m.kp.pubkey())),
                 proposal: p,
                 system_program: SYSTEM,
             }
@@ -845,14 +889,11 @@ fn ix_init_voting(d: &Dao, gp: Pubkey, authority: &Pubkey, config: VotingConfig)
             payer: *authority,
             hub_dao: d.dao,
             governance: d.governance(gp),
-            mint: d.mint,
             dao_token: hub::dao_token_address(&d.dao),
-            vault: d.vault(gp),
-            token_program: spl_token_interface::ID,
             system_program: SYSTEM,
         }
         .to_account_metas(None),
-        data: vortex_token_weighted::instruction::InitGovernance { config }.data(),
+        data: vortex_token_weighted::instruction::InitGovernance { epoch: d.epoch, config }.data(),
     }
 }
 
@@ -861,7 +902,7 @@ fn ix_init_board(d: &Dao, authority: &Pubkey, signers: Vec<Pubkey>, config: vort
         program_id: BOARD,
         accounts: vortex_board::accounts::InitGovernance { authority: *authority, payer: *authority, hub_dao: d.dao, governance: d.governance(BOARD), system_program: SYSTEM }
             .to_account_metas(None),
-        data: vortex_board::instruction::InitGovernance { signers, config }.data(),
+        data: vortex_board::instruction::InitGovernance { epoch: d.epoch, signers, config }.data(),
     }
 }
 

@@ -1,0 +1,8 @@
+{
+  "source": "@ellipsis-labs/rise test-fixtures/sdk-account-fixtures.json (mainnetPerpAssetMap)",
+  "slot": 428272682,
+  "owner": "EtrnLzgbS7nMMy5fbD42kXiUzGg8XQzJ972Xtk1cjWih",
+  "space": 1622064,
+  "dataSha256": "a4fd484207c64452d962f0728619671854ca9dc279a9caa2a2991029cc6b05dc",
+  "note": "First 48 + slots_used*1584 bytes; the rest of the account is zeros."
+}

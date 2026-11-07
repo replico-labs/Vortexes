@@ -29,10 +29,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -63,10 +60,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -106,10 +100,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -126,8 +117,10 @@
     {
       "name": "declare_candidacy",
       "docs": [
-        "Stands in an open election, during its candidacy window. Needs",
-        "`candidacy_threshold` deposited, which stays locked until voting ends."
+        "Stands for `seat` (0 to council_size - 1) in an open election, during",
+        "its candidacy window; one seat per election. Needs",
+        "`candidacy_threshold` staked in the election's pool, which stays",
+        "locked until voting ends."
       ],
       "discriminator": [
         14,
@@ -145,131 +138,42 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "election"
-          ]
+          "name": "governance"
+        },
+        {
+          "name": "hub_dao"
         },
         {
           "name": "election",
           "writable": true
         },
         {
-          "name": "voter",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  111,
-                  116,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "account",
-                "path": "candidate"
-              }
-            ]
-          }
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "deposit",
-      "docs": [
-        "Deposits the DAO's token, adding election and recall weight."
-      ],
-      "discriminator": [
-        242,
-        35,
-        198,
-        137,
-        82,
-        225,
-        242,
-        182
-      ],
-      "accounts": [
-        {
-          "name": "owner",
-          "writable": true,
-          "signer": true
+          "name": "pool"
         },
         {
-          "name": "governance",
+          "name": "stake",
           "writable": true
         },
         {
-          "name": "voter",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  111,
-                  116,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "owner_token_account",
-          "writable": true
-        },
-        {
-          "name": "vault",
-          "writable": true,
-          "relations": [
-            "governance"
-          ]
-        },
-        {
-          "name": "mint",
-          "relations": [
-            "governance"
-          ]
-        },
-        {
-          "name": "token_program"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "stake_program"
         }
       ],
       "args": [
         {
-          "name": "amount",
-          "type": "u64"
+          "name": "seat",
+          "type": "u8"
         }
       ]
     },
     {
       "name": "finalize_election",
       "docs": [
-        "Closes an election once voting ends and seats the winners. Anyone."
+        "Closes an election once voting ends. Each seat goes to its most-voted",
+        "candidate; a seat nobody ran for keeps its holder (unless they won",
+        "another seat). If a seat is tied, the same transaction must first ask",
+        "ORAO for randomness at `tie_seed(governance, id)` and pass that",
+        "request as `randomness`; `resolve_ties` then seats the council.",
+        "Anyone."
       ],
       "discriminator": [
         175,
@@ -284,14 +188,18 @@
       "accounts": [
         {
           "name": "governance",
-          "writable": true,
-          "relations": [
-            "election"
-          ]
+          "writable": true
         },
         {
           "name": "election",
           "writable": true
+        },
+        {
+          "name": "randomness",
+          "docs": [
+            "ORAO's request for the tie draw, when a seat is tied."
+          ],
+          "optional": true
         }
       ],
       "args": []
@@ -315,10 +223,7 @@
       "accounts": [
         {
           "name": "governance",
-          "writable": true,
-          "relations": [
-            "recall"
-          ]
+          "writable": true
         },
         {
           "name": "recall",
@@ -360,65 +265,24 @@
         },
         {
           "name": "governance",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  111,
-                  118,
-                  101,
-                  114,
-                  110,
-                  97,
-                  110,
-                  99,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "hub_dao"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "mint"
+          "name": "dao_token",
+          "docs": [
+            "The DAO's token on record at the hub (set_dao_token): a token model",
+            "needs one, as members stake it in the hub's pool."
+          ]
         },
         {
-          "name": "vault",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  97,
-                  117,
-                  108,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              }
-            ]
-          }
-        },
-        {
-          "name": "token_program"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
+        {
+          "name": "epoch",
+          "type": "u32"
+        },
         {
           "name": "council",
           "type": {
@@ -438,8 +302,8 @@
     {
       "name": "initiate_recall",
       "docs": [
-        "Starts a token vote on removing `member` from the council. Needs",
-        "`candidacy_threshold` deposited. `id` must be recall_count + 1."
+        "Starts a token vote on removing `member` from the council, in the",
+        "DAO's current pool. Needs `candidacy_threshold` staked there. `id` must be recall_count + 1."
       ],
       "discriminator": [
         5,
@@ -462,60 +326,26 @@
           "writable": true
         },
         {
-          "name": "voter",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  111,
-                  116,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "account",
-                "path": "initiator"
-              }
-            ]
-          }
+          "name": "hub_dao"
+        },
+        {
+          "name": "dao_token"
+        },
+        {
+          "name": "pool",
+          "docs": [
+            "The DAO's current pool, which the recall keeps."
+          ]
+        },
+        {
+          "name": "stake"
         },
         {
           "name": "recall",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  101,
-                  99,
-                  97,
-                  108,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -556,43 +386,14 @@
           "writable": true
         },
         {
-          "name": "hub_dao",
-          "relations": [
-            "governance"
-          ]
+          "name": "hub_dao"
         },
         {
           "name": "proposal",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  114,
-                  111,
-                  112,
-                  111,
-                  115,
-                  97,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -634,10 +435,7 @@
       ],
       "accounts": [
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -645,6 +443,74 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "resolve_ties",
+      "docs": [
+        "Seats the council once ORAO has drawn the tied seats, or, after",
+        "TIE_DRAW_TIMEOUT without an answer, gives ties to whoever declared",
+        "first. Anyone."
+      ],
+      "discriminator": [
+        70,
+        113,
+        102,
+        231,
+        100,
+        85,
+        93,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "governance",
+          "writable": true
+        },
+        {
+          "name": "election",
+          "writable": true
+        },
+        {
+          "name": "randomness"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_seat_label",
+      "docs": [
+        "Names a seat, e.g. \"Treasurer\" (only through a passed proposal)."
+      ],
+      "discriminator": [
+        40,
+        104,
+        45,
+        217,
+        62,
+        203,
+        6,
+        239
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "seat",
+          "type": "u8"
+        },
+        {
+          "name": "label",
+          "type": "string"
+        }
+      ]
     },
     {
       "name": "start_election",
@@ -673,37 +539,23 @@
           "writable": true
         },
         {
-          "name": "election",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  108,
-                  101,
-                  99,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "name": "hub_dao"
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "dao_token"
+        },
+        {
+          "name": "pool",
+          "docs": [
+            "The DAO's current pool, which the election keeps."
+          ]
+        },
+        {
+          "name": "election",
+          "writable": true
+        },
+        {
+          "name": "system_program"
         }
       ],
       "args": [
@@ -753,9 +605,9 @@
     {
       "name": "vote_in_election",
       "docs": [
-        "Votes for 1 to `council_size` different candidates; each gets the",
-        "member's whole deposit. Once per election; locks the deposit until",
-        "voting ends."
+        "Votes for at most one candidate per seat; each choice gets the",
+        "member's whole stake in the election's pool. Once per election; locks",
+        "the stake until voting ends."
       ],
       "discriminator": [
         244,
@@ -774,71 +626,31 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "election"
-          ]
+          "name": "governance"
+        },
+        {
+          "name": "hub_dao"
         },
         {
           "name": "election",
           "writable": true
         },
         {
-          "name": "voter",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  111,
-                  116,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
+          "name": "pool"
+        },
+        {
+          "name": "stake",
+          "writable": true
+        },
+        {
+          "name": "stake_program"
         },
         {
           "name": "ballot",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  98,
-                  97,
-                  108,
-                  108,
-                  111,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "election"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -853,8 +665,8 @@
     {
       "name": "vote_recall",
       "docs": [
-        "Votes on a recall, weighted by deposit. Once per recall; locks the",
-        "deposit until it ends."
+        "Votes on a recall, weighted by stake in its pool. Once per recall;",
+        "locks the stake until it ends."
       ],
       "discriminator": [
         208,
@@ -873,76 +685,31 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "recall"
-          ]
+          "name": "governance"
+        },
+        {
+          "name": "hub_dao"
         },
         {
           "name": "recall",
           "writable": true
         },
         {
-          "name": "voter",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  111,
-                  116,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
+          "name": "pool"
+        },
+        {
+          "name": "stake",
+          "writable": true
+        },
+        {
+          "name": "stake_program"
         },
         {
           "name": "recall_vote",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  114,
-                  101,
-                  99,
-                  97,
-                  108,
-                  108,
-                  95,
-                  118,
-                  111,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "recall"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -953,85 +720,6 @@
               "name": "VoteChoice"
             }
           }
-        }
-      ]
-    },
-    {
-      "name": "withdraw",
-      "docs": [
-        "Withdraws a deposit once the elections and recalls the owner voted",
-        "or stood in have closed."
-      ],
-      "discriminator": [
-        183,
-        18,
-        70,
-        156,
-        148,
-        109,
-        161,
-        34
-      ],
-      "accounts": [
-        {
-          "name": "owner",
-          "signer": true
-        },
-        {
-          "name": "governance",
-          "writable": true
-        },
-        {
-          "name": "voter",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  118,
-                  111,
-                  116,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "account",
-                "path": "owner"
-              }
-            ]
-          }
-        },
-        {
-          "name": "owner_token_account",
-          "writable": true
-        },
-        {
-          "name": "vault",
-          "writable": true,
-          "relations": [
-            "governance"
-          ]
-        },
-        {
-          "name": "mint",
-          "relations": [
-            "governance"
-          ]
-        },
-        {
-          "name": "token_program"
-        }
-      ],
-      "args": [
-        {
-          "name": "amount",
-          "type": "u64"
         }
       ]
     }
@@ -1114,19 +802,6 @@
         133,
         6
       ]
-    },
-    {
-      "name": "Voter",
-      "discriminator": [
-        241,
-        93,
-        35,
-        191,
-        254,
-        147,
-        17,
-        202
-      ]
     }
   ],
   "events": [
@@ -1154,19 +829,6 @@
         19,
         198,
         194
-      ]
-    },
-    {
-      "name": "Deposited",
-      "discriminator": [
-        111,
-        141,
-        26,
-        45,
-        161,
-        35,
-        100,
-        57
       ]
     },
     {
@@ -1313,6 +975,32 @@
       ]
     },
     {
+      "name": "SeatLabelSet",
+      "discriminator": [
+        189,
+        184,
+        98,
+        195,
+        164,
+        180,
+        34,
+        247
+      ]
+    },
+    {
+      "name": "TieDrawStarted",
+      "discriminator": [
+        131,
+        20,
+        250,
+        165,
+        78,
+        114,
+        68,
+        164
+      ]
+    },
+    {
       "name": "VoteCast",
       "discriminator": [
         39,
@@ -1323,19 +1011,6 @@
         17,
         225,
         213
-      ]
-    },
-    {
-      "name": "Withdrawn",
-      "discriminator": [
-        20,
-        89,
-        223,
-        198,
-        194,
-        124,
-        219,
-        13
       ]
     }
   ],
@@ -1387,6 +1062,10 @@
           {
             "name": "candidate",
             "type": "pubkey"
+          },
+          {
+            "name": "seat",
+            "type": "u8"
           }
         ]
       }
@@ -1403,6 +1082,13 @@
           {
             "name": "votes",
             "type": "u64"
+          },
+          {
+            "name": "seat",
+            "docs": [
+              "The seat they run for."
+            ],
+            "type": "u8"
           }
         ]
       }
@@ -1423,6 +1109,47 @@
                 "name": "DelegateConfig"
               }
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "Council",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "signers",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "required",
+            "docs": [
+              "How many signers must confirm."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "tenure",
+            "docs": [
+              "Seconds after `seated_at` before the DAO can replace the signers",
+              "without their confirmation."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "seated_at",
+            "type": "i64"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Goes up with every change, so approvals given to an earlier council",
+              "don't count."
+            ],
+            "type": "u32"
           }
         ]
       }
@@ -1474,7 +1201,7 @@
           {
             "name": "governance",
             "docs": [
-              "The DAO's account in that program: `[GOVERNANCE_SEED, dao]` there."
+              "The DAO's account in that program: `[GOVERNANCE_SEED, dao, epoch]` there."
             ],
             "type": "pubkey"
           },
@@ -1506,6 +1233,58 @@
           },
           {
             "name": "executor_bump",
+            "type": "u8"
+          },
+          {
+            "name": "council",
+            "docs": [
+              "The security council, when on."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Council"
+                }
+              }
+            }
+          },
+          {
+            "name": "allowance_count",
+            "docs": [
+              "How many allowances this DAO has granted (the latest id)."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DaoToken",
+      "docs": [
+        "The DAO's token: `[TOKEN_SEED, dao]`. Members stake in `pool`, the",
+        "only pool that takes new stake, and token-based governance reads voting",
+        "power from it."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "docs": [
+              "vortex-stake's pool for `mint`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
             "type": "u8"
           }
         ]
@@ -1603,30 +1382,6 @@
       }
     },
     {
-      "name": "Deposited",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "governance",
-            "type": "pubkey"
-          },
-          {
-            "name": "owner",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "total",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
       "name": "Election",
       "type": {
         "kind": "struct",
@@ -1648,6 +1403,13 @@
             "type": "i64"
           },
           {
+            "name": "pool",
+            "docs": [
+              "The DAO's stake pool when it started: weights are stake there."
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "candidates",
             "type": {
               "vec": {
@@ -1664,6 +1426,17 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "awaiting_draw",
+            "docs": [
+              "A tied seat is waiting for ORAO's draw (since `draw_started_at`)."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "draw_started_at",
+            "type": "i64"
           }
         ]
       }
@@ -1785,14 +1558,6 @@
             "type": "pubkey"
           },
           {
-            "name": "mint",
-            "type": "pubkey"
-          },
-          {
-            "name": "vault",
-            "type": "pubkey"
-          },
-          {
             "name": "config",
             "type": {
               "defined": {
@@ -1834,12 +1599,24 @@
             "type": "u64"
           },
           {
-            "name": "total_deposited",
-            "type": "u64"
+            "name": "epoch",
+            "docs": [
+              "The hub epoch this setup is for (part of its address)."
+            ],
+            "type": "u32"
           },
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "seat_labels",
+            "docs": [
+              "Seat names, by seat (set by proposal; may be shorter than the council)."
+            ],
+            "type": {
+              "vec": "string"
+            }
           }
         ]
       }
@@ -1886,6 +1663,44 @@
           {
             "name": "ready_at",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Pool",
+      "docs": [
+        "A DAO's pool for one token: `[POOL_SEED, dao, mint]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "total",
+            "docs": [
+              "Everything staked here (raw tokens)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }
@@ -2146,9 +1961,16 @@
             "type": "i64"
           },
           {
+            "name": "pool",
+            "docs": [
+              "The DAO's stake pool when it started: weights are stake there."
+            ],
+            "type": "pubkey"
+          },
+          {
             "name": "quorum_base",
             "docs": [
-              "All deposits when it started: what quorum is measured against."
+              "Everything in the pool when it started: what quorum is measured against."
             ],
             "type": "u64"
           },
@@ -2304,6 +2126,71 @@
       }
     },
     {
+      "name": "SeatLabelSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "seat",
+            "type": "u8"
+          },
+          {
+            "name": "label",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Stake",
+      "docs": [
+        "One member's stake in a pool: `[STAKE_SEED, pool, owner]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Staked (raw tokens)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "locked",
+            "docs": [
+              "Held by `Lock`s, one per governance that locked some."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "locked_until",
+            "docs": [
+              "The whole stake stays until this time (the end of the latest vote",
+              "it was cast in)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "StoredAccountMeta",
       "docs": [
         "One account an instruction touches."
@@ -2379,6 +2266,35 @@
       }
     },
     {
+      "name": "TieDrawStarted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "election",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "seed",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "VoteCast",
       "type": {
         "kind": "struct",
@@ -2426,58 +2342,6 @@
           },
           {
             "name": "Abstain"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Voter",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "governance",
-            "type": "pubkey"
-          },
-          {
-            "name": "owner",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "locked_until",
-            "type": "i64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Withdrawn",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "governance",
-            "type": "pubkey"
-          },
-          {
-            "name": "owner",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "total",
-            "type": "u64"
           }
         ]
       }

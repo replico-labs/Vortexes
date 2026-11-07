@@ -1,0 +1,1925 @@
+{
+  "address": "GjVM1GkPEzXMRLsrP2FLr9UXJpXDVnwGVsVYbzTvtAU5",
+  "metadata": {
+    "name": "vortex_vault",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Vortexes prop-firm vault: a prop-firm DAO's pooled fund, whose shares are the DAO's own token. Deposits and redemptions are priced together at windows, at a value the program computes itself from Phoenix's accounts."
+  },
+  "instructions": [
+    {
+      "name": "cancel_deposit",
+      "discriminator": [
+        207,
+        37,
+        219,
+        229,
+        183,
+        50,
+        54,
+        245
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "epoch",
+          "writable": true
+        },
+        {
+          "name": "request",
+          "writable": true
+        },
+        {
+          "name": "to",
+          "writable": true
+        },
+        {
+          "name": "assets",
+          "writable": true
+        },
+        {
+          "name": "asset_mint"
+        },
+        {
+          "name": "asset_token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_redeem",
+      "discriminator": [
+        111,
+        76,
+        232,
+        50,
+        39,
+        175,
+        48,
+        242
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "signer": true
+        },
+        {
+          "name": "vault"
+        },
+        {
+          "name": "epoch",
+          "writable": true
+        },
+        {
+          "name": "request",
+          "writable": true
+        },
+        {
+          "name": "to",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "share_mint"
+        },
+        {
+          "name": "share_token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "check_drawdown",
+      "docs": [
+        "Anyone (the bot's keeper) can check the drawdown between windows:",
+        "below the limit, trading pauses until a proposal resumes it."
+      ],
+      "discriminator": [
+        80,
+        116,
+        81,
+        5,
+        102,
+        81,
+        95,
+        138
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "assets"
+        },
+        {
+          "name": "share_mint"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_fees",
+      "docs": [
+        "Pays fee recipient `index` the fee shares owed to it. Anyone, into",
+        "the recipient's own account."
+      ],
+      "discriminator": [
+        82,
+        251,
+        233,
+        156,
+        12,
+        52,
+        184,
+        202
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "to",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "share_mint"
+        },
+        {
+          "name": "share_token_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "index",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "claim_redemption",
+      "docs": [
+        "Your money from a processed epoch's redemption, as far as the vault",
+        "holds it idle (the rest once the desk has brought money back).",
+        "Anyone, into the owner's own account."
+      ],
+      "discriminator": [
+        109,
+        110,
+        9,
+        188,
+        195,
+        217,
+        112,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "epoch"
+        },
+        {
+          "name": "request",
+          "writable": true
+        },
+        {
+          "name": "to",
+          "writable": true
+        },
+        {
+          "name": "assets",
+          "writable": true
+        },
+        {
+          "name": "asset_mint"
+        },
+        {
+          "name": "asset_token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_shares",
+      "docs": [
+        "Your shares from a processed epoch's deposit."
+      ],
+      "discriminator": [
+        130,
+        131,
+        29,
+        237,
+        134,
+        20,
+        110,
+        245
+      ],
+      "accounts": [
+        {
+          "name": "vault"
+        },
+        {
+          "name": "epoch"
+        },
+        {
+          "name": "request",
+          "writable": true
+        },
+        {
+          "name": "to",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "share_mint"
+        },
+        {
+          "name": "share_token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_vault",
+      "docs": [
+        "Opens a DAO's vault over `asset_mint`, with the DAO's token as its",
+        "shares. Signed by the share mint's authority, which must be the DAO's",
+        "creator (at a launch) or its treasury (a proposal); minting passes to",
+        "the vault here, so the token only ever comes from deposits. The token",
+        "has no supply yet and no freeze authority. `seeder` may seed it once",
+        "(a launch's raise); default: nobody."
+      ],
+      "discriminator": [
+        29,
+        237,
+        247,
+        208,
+        193,
+        82,
+        54,
+        135
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "creator",
+          "docs": [
+            "The share mint's authority: the DAO's creator or its treasury."
+          ],
+          "signer": true
+        },
+        {
+          "name": "hub_dao"
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "share_mint",
+          "writable": true
+        },
+        {
+          "name": "asset_mint"
+        },
+        {
+          "name": "assets",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "asset_token_program"
+        },
+        {
+          "name": "share_token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": {
+              "name": "VaultConfig"
+            }
+          }
+        },
+        {
+          "name": "fee_splits",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "FeeSplitTerms"
+              }
+            }
+          }
+        },
+        {
+          "name": "seeder",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "execute",
+      "docs": [
+        "Runs one instruction as the vault: moving money to or from Phoenix,",
+        "delegating a subaccount to a trader's key, and so on. The first",
+        "remaining account is the program to call, the rest its accounts (the",
+        "vault signs where it appears). Never the share mint or the escrow",
+        "(members' shares), never this program, and not in the run-up to a",
+        "window."
+      ],
+      "discriminator": [
+        130,
+        221,
+        242,
+        154,
+        13,
+        193,
+        189,
+        29
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "data",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "docs": [
+        "Pauses trading by proposal, e.g. ahead of a vote on the desk."
+      ],
+      "discriminator": [
+        211,
+        22,
+        221,
+        251,
+        74,
+        121,
+        193,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "process_window",
+      "docs": [
+        "Prices the open epoch's requests. Anyone, once the window is due and",
+        "nothing has moved for `settle_delay`. Remaining accounts: the venue",
+        "accounts in the vault's order (see `set_venues`)."
+      ],
+      "discriminator": [
+        149,
+        75,
+        65,
+        129,
+        54,
+        160,
+        56,
+        184
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "epoch",
+          "writable": true
+        },
+        {
+          "name": "assets"
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "share_mint",
+          "writable": true
+        },
+        {
+          "name": "share_token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "request_deposit",
+      "discriminator": [
+        243,
+        202,
+        197,
+        215,
+        135,
+        97,
+        213,
+        109
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "epoch",
+          "writable": true
+        },
+        {
+          "name": "request",
+          "writable": true
+        },
+        {
+          "name": "allowed",
+          "docs": [
+            "Needed when the vault isn't open to all: `[ALLOWED_SEED, vault, user]`."
+          ],
+          "optional": true
+        },
+        {
+          "name": "from",
+          "writable": true
+        },
+        {
+          "name": "assets",
+          "writable": true
+        },
+        {
+          "name": "asset_mint"
+        },
+        {
+          "name": "asset_token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "request_redeem",
+      "docs": [
+        "Hands `amount` shares to the vault, to redeem at the next window."
+      ],
+      "discriminator": [
+        105,
+        49,
+        44,
+        38,
+        207,
+        241,
+        33,
+        173
+      ],
+      "accounts": [
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault"
+        },
+        {
+          "name": "epoch",
+          "writable": true
+        },
+        {
+          "name": "request",
+          "writable": true
+        },
+        {
+          "name": "from",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "share_mint"
+        },
+        {
+          "name": "share_token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "resume",
+      "docs": [
+        "Resumes trading after a drawdown pause."
+      ],
+      "discriminator": [
+        1,
+        166,
+        51,
+        170,
+        127,
+        32,
+        141,
+        206
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "seed",
+      "docs": [
+        "The money already in the vault becomes its first shares, sent to",
+        "`receiver` (the Distributor, which shares them among the raise's",
+        "contributors). Once, by the seeder, while there are no shares."
+      ],
+      "discriminator": [
+        255,
+        178,
+        140,
+        239,
+        113,
+        22,
+        214,
+        231
+      ],
+      "accounts": [
+        {
+          "name": "seeder",
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "assets"
+        },
+        {
+          "name": "share_mint",
+          "writable": true
+        },
+        {
+          "name": "receiver",
+          "writable": true
+        },
+        {
+          "name": "share_token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_allowed",
+      "docs": [
+        "Lets `who` deposit (or stops them) while the vault isn't open to all."
+      ],
+      "discriminator": [
+        172,
+        134,
+        133,
+        128,
+        12,
+        254,
+        134,
+        112
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault"
+        },
+        {
+          "name": "allowed",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "who",
+          "type": "pubkey"
+        },
+        {
+          "name": "ok",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "set_config",
+      "discriminator": [
+        108,
+        158,
+        154,
+        175,
+        212,
+        98,
+        52,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "config",
+          "type": {
+            "defined": {
+              "name": "VaultConfig"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_fee_splits",
+      "docs": [
+        "Replaces who gets the fees, once every recipient has claimed theirs."
+      ],
+      "discriminator": [
+        128,
+        192,
+        6,
+        243,
+        95,
+        243,
+        227,
+        114
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "fee_splits",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "FeeSplitTerms"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "set_venues",
+      "docs": [
+        "The venue accounts the vault is valued from: Phoenix's PerpAssetMap",
+        "and the vault's Phoenix trader accounts (cross and isolated",
+        "subaccounts), and other token accounts the vault owns that count 1:1",
+        "(e.g. Phoenix's collateral token). The DAO registers each before",
+        "moving money into it; a window must see all of them."
+      ],
+      "discriminator": [
+        75,
+        218,
+        40,
+        207,
+        247,
+        13,
+        51,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "perp_asset_map",
+          "type": "pubkey"
+        },
+        {
+          "name": "phoenix_traders",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "extra_tokens",
+          "type": {
+            "vec": "pubkey"
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Allowed",
+      "discriminator": [
+        222,
+        158,
+        208,
+        204,
+        168,
+        6,
+        209,
+        71
+      ]
+    },
+    {
+      "name": "Vault",
+      "discriminator": [
+        211,
+        8,
+        232,
+        43,
+        2,
+        152,
+        117,
+        119
+      ]
+    },
+    {
+      "name": "VaultEpoch",
+      "discriminator": [
+        255,
+        29,
+        204,
+        186,
+        8,
+        164,
+        16,
+        137
+      ]
+    },
+    {
+      "name": "VaultRequest",
+      "discriminator": [
+        247,
+        197,
+        226,
+        96,
+        16,
+        245,
+        213,
+        224
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "ConfigSet",
+      "discriminator": [
+        15,
+        104,
+        59,
+        16,
+        236,
+        241,
+        8,
+        6
+      ]
+    },
+    {
+      "name": "DepositCancelled",
+      "discriminator": [
+        233,
+        23,
+        42,
+        206,
+        203,
+        207,
+        147,
+        35
+      ]
+    },
+    {
+      "name": "DepositRequested",
+      "discriminator": [
+        35,
+        33,
+        229,
+        138,
+        116,
+        238,
+        192,
+        22
+      ]
+    },
+    {
+      "name": "FeesClaimed",
+      "discriminator": [
+        22,
+        104,
+        110,
+        222,
+        38,
+        157,
+        14,
+        62
+      ]
+    },
+    {
+      "name": "Moved",
+      "discriminator": [
+        114,
+        50,
+        71,
+        164,
+        81,
+        115,
+        48,
+        128
+      ]
+    },
+    {
+      "name": "Paused",
+      "discriminator": [
+        172,
+        248,
+        5,
+        253,
+        49,
+        255,
+        255,
+        232
+      ]
+    },
+    {
+      "name": "RedeemCancelled",
+      "discriminator": [
+        209,
+        166,
+        7,
+        223,
+        49,
+        25,
+        200,
+        82
+      ]
+    },
+    {
+      "name": "RedeemRequested",
+      "discriminator": [
+        5,
+        130,
+        67,
+        249,
+        243,
+        168,
+        11,
+        88
+      ]
+    },
+    {
+      "name": "RedemptionPaid",
+      "discriminator": [
+        56,
+        163,
+        25,
+        104,
+        151,
+        22,
+        248,
+        180
+      ]
+    },
+    {
+      "name": "Resumed",
+      "discriminator": [
+        81,
+        131,
+        117,
+        230,
+        240,
+        120,
+        120,
+        14
+      ]
+    },
+    {
+      "name": "Seeded",
+      "discriminator": [
+        95,
+        55,
+        75,
+        113,
+        178,
+        157,
+        251,
+        224
+      ]
+    },
+    {
+      "name": "SharesClaimed",
+      "discriminator": [
+        135,
+        17,
+        55,
+        130,
+        218,
+        208,
+        153,
+        101
+      ]
+    },
+    {
+      "name": "VaultCreated",
+      "discriminator": [
+        117,
+        25,
+        120,
+        254,
+        75,
+        236,
+        78,
+        115
+      ]
+    },
+    {
+      "name": "VenuesSet",
+      "discriminator": [
+        65,
+        116,
+        168,
+        131,
+        23,
+        110,
+        199,
+        36
+      ]
+    },
+    {
+      "name": "WindowProcessed",
+      "discriminator": [
+        220,
+        186,
+        130,
+        127,
+        173,
+        159,
+        142,
+        78
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "Allowed",
+      "docs": [
+        "`[ALLOWED_SEED, vault, who]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "who",
+            "type": "pubkey"
+          },
+          {
+            "name": "ok",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConfigSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Council",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "signers",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "required",
+            "docs": [
+              "How many signers must confirm."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "tenure",
+            "docs": [
+              "Seconds after `seated_at` before the DAO can replace the signers",
+              "without their confirmation."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "seated_at",
+            "type": "i64"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Goes up with every change, so approvals given to an earlier council",
+              "don't count."
+            ],
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Dao",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "create_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "governance_program",
+            "docs": [
+              "The governance program running the DAO now."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "governance",
+            "docs": [
+              "The DAO's account in that program: `[GOVERNANCE_SEED, dao, epoch]` there."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "Starts at 1 and goes up with every switch. Proposals only run in",
+              "the epoch they were made in."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "pending_switch",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PendingSwitch"
+                }
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "treasury_bump",
+            "type": "u8"
+          },
+          {
+            "name": "executor_bump",
+            "type": "u8"
+          },
+          {
+            "name": "council",
+            "docs": [
+              "The security council, when on."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Council"
+                }
+              }
+            }
+          },
+          {
+            "name": "allowance_count",
+            "docs": [
+              "How many allowances this DAO has granted (the latest id)."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DepositCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "who",
+            "type": "pubkey"
+          },
+          {
+            "name": "assets",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DepositRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "who",
+            "type": "pubkey"
+          },
+          {
+            "name": "assets",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeSplit",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "bps",
+            "type": "u16"
+          },
+          {
+            "name": "owed",
+            "docs": [
+              "Fee shares (in the escrow) not yet claimed."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeSplitTerms",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "bps",
+            "docs": [
+              "Of each fee; the splits add up to 10,000."
+            ],
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeesClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "shares",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Moved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "program",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Paused",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "type": "u128"
+          },
+          {
+            "name": "high_water",
+            "type": "u128"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PendingSwitch",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program",
+            "type": "pubkey"
+          },
+          {
+            "name": "ready_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RedeemCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "who",
+            "type": "pubkey"
+          },
+          {
+            "name": "shares",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RedeemRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "who",
+            "type": "pubkey"
+          },
+          {
+            "name": "shares",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RedemptionPaid",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "who",
+            "type": "pubkey"
+          },
+          {
+            "name": "assets",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Resumed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Seeded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "assets",
+            "type": "u64"
+          },
+          {
+            "name": "shares",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SharesClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "who",
+            "type": "pubkey"
+          },
+          {
+            "name": "shares",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Vault",
+      "docs": [
+        "`[VAULT_SEED, dao]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_decimals",
+            "type": "u8"
+          },
+          {
+            "name": "share_mint",
+            "docs": [
+              "The DAO's token; the vault is its only minter."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "share_token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "assets",
+            "docs": [
+              "Idle money: `[ASSETS_SEED, vault]`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "escrow",
+            "docs": [
+              "Shares waiting to be redeemed or claimed, and fee shares owed: `[ESCROW_SEED, vault]`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "seeder",
+            "docs": [
+              "May seed the vault once (a launch's raise); default: nobody."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "VaultConfig"
+              }
+            }
+          },
+          {
+            "name": "fee_splits",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "FeeSplit"
+                }
+              }
+            }
+          },
+          {
+            "name": "perp_asset_map",
+            "type": "pubkey"
+          },
+          {
+            "name": "phoenix_traders",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "extra_tokens",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "The open epoch: requests made now are priced at its window."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "next_window_at",
+            "type": "i64"
+          },
+          {
+            "name": "last_move_at",
+            "type": "i64"
+          },
+          {
+            "name": "last_fee_at",
+            "type": "i64"
+          },
+          {
+            "name": "high_water",
+            "docs": [
+              "The best share price after fees so far (asset units per share unit, times ONE)."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "seeded",
+            "type": "bool"
+          },
+          {
+            "name": "pending_deposit_assets",
+            "docs": [
+              "In the open epoch."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "owed_assets",
+            "docs": [
+              "Redemptions priced, not yet paid."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "initial_rate",
+            "docs": [
+              "Share units per asset unit for the first deposit (one share per asset)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "interval",
+            "docs": [
+              "Seconds between windows, e.g. 30 days."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "freeze_before",
+            "docs": [
+              "No moves this long before a window."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "settle_delay",
+            "docs": [
+              "A window waits this long after the last move."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "management_bps",
+            "docs": [
+              "Per year, of the vault's value."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "performance_bps",
+            "docs": [
+              "Of gains above the high water mark."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_drawdown_bps",
+            "docs": [
+              "Below the high water mark that pauses trading; 0: off."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "open_to_all",
+            "docs": [
+              "False: only addresses the DAO allowed may deposit."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "max_price_age_slots",
+            "docs": [
+              "The oldest Phoenix mark price a valuation accepts, in slots."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "share_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "seeder",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultEpoch",
+      "docs": [
+        "`[EPOCH_SEED, vault, epoch]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "deposit_assets",
+            "type": "u64"
+          },
+          {
+            "name": "deposit_shares",
+            "type": "u64"
+          },
+          {
+            "name": "redeem_shares",
+            "type": "u64"
+          },
+          {
+            "name": "redeem_assets",
+            "type": "u64"
+          },
+          {
+            "name": "processed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultRequest",
+      "docs": [
+        "`[REQUEST_SEED, vault, epoch, owner]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "deposit",
+            "type": "u64"
+          },
+          {
+            "name": "redeem",
+            "type": "u64"
+          },
+          {
+            "name": "redeem_paid",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VenuesSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "traders",
+            "type": "u8"
+          },
+          {
+            "name": "extra_tokens",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WindowProcessed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u64"
+          },
+          {
+            "name": "value",
+            "type": "u64"
+          },
+          {
+            "name": "supply",
+            "type": "u64"
+          },
+          {
+            "name": "fee_shares",
+            "type": "u64"
+          },
+          {
+            "name": "redeemed_shares",
+            "type": "u64"
+          },
+          {
+            "name": "redeemed_assets",
+            "type": "u64"
+          },
+          {
+            "name": "deposited_assets",
+            "type": "u64"
+          },
+          {
+            "name": "minted_shares",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

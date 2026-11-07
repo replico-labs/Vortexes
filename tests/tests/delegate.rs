@@ -91,20 +91,22 @@ fn members_elect_a_new_council() {
     let e = env.start_election().unwrap();
     assert_eq!(code(env.start_election()), err(GovError::ElectionInProgress));
 
-    for m in [&alice, &bob, &dave, &eve] {
-        env.declare(m, e).unwrap();
+    // Alice runs for seat 0, bob for seat 1, dave and eve for seat 2.
+    for (m, seat) in [(&alice, 0), (&bob, 1), (&dave, 2), (&eve, 2)] {
+        env.declare(m, e, seat).unwrap();
     }
-    assert_eq!(code(env.declare(&carol, e)), err(GovError::ProposalThresholdNotMet), "50 < 100");
-    assert_eq!(code(env.declare(&alice, e)), err(GovError::AlreadyCandidate));
+    assert_eq!(code(env.declare(&carol, e, 0)), err(GovError::ProposalThresholdNotMet), "50 < 100");
+    assert_eq!(code(env.declare(&alice, e, 1)), err(GovError::AlreadyCandidate));
     let [ka, kb, kd, ke] = [&alice, &bob, &dave, &eve].map(|m| m.kp.pubkey());
     assert_eq!(code(env.elect(&alice, e, vec![ka])), err(GovError::ElectionVotingNotOpen), "still declaring");
 
     env.warp(START + 1_050);
-    assert_eq!(code(env.declare(&carol, e)), err(GovError::CandidacyClosed));
+    assert_eq!(code(env.declare(&carol, e, 0)), err(GovError::CandidacyClosed));
     assert_eq!(code(env.elect(&alice, e, vec![])), err(GovError::InvalidBallot));
     assert_eq!(code(env.elect(&alice, e, vec![ka, kb, kd, ke])), err(GovError::InvalidBallot), "3 seats");
     assert_eq!(code(env.elect(&alice, e, vec![ka, ka])), err(GovError::DuplicateCandidate));
     assert_eq!(code(env.elect(&alice, e, vec![carol.kp.pubkey()])), err(GovError::NotCandidate));
+    assert_eq!(code(env.elect(&alice, e, vec![kd, ke])), err(GovError::OneCandidatePerSeat), "both run for seat 2");
     env.elect(&alice, e, vec![ka, kb]).unwrap(); // 600 each
     env.elect(&bob, e, vec![kb, kd]).unwrap(); // 400 each
     env.elect(&carol, e, vec![kd]).unwrap(); // 50
@@ -118,7 +120,7 @@ fn members_elect_a_new_council() {
     env.finalize_election(e).unwrap();
     assert_eq!(code(env.finalize_election(e)), err(GovError::AlreadyFinalized));
     let g = env.del_governance();
-    assert_eq!(g.council, vec![kb, ka, kd], "bob 1000, alice 600, dave 450; eve 200 misses out");
+    assert_eq!(g.council, vec![ka, kb, kd], "seat by seat: alice 600, bob 1000, dave 450 beats eve 200");
     assert_eq!((g.council_term, g.term_ends_at), (2, START + 2_150));
     env.withdraw(DEL, &alice, 600).unwrap();
 
@@ -132,7 +134,7 @@ fn an_election_nobody_votes_in_keeps_the_council() {
     let Dao { mut env, council, alice, .. } = delegate_dao(del_config());
     env.warp(START + 1_000);
     let e = env.start_election().unwrap();
-    env.declare(&alice, e).unwrap();
+    env.declare(&alice, e, 0).unwrap();
     env.warp(START + 1_150);
     env.finalize_election(e).unwrap();
     let g = env.del_governance();
@@ -151,14 +153,14 @@ fn a_new_council_ends_the_old_councils_proposals() {
     env.council_vote(&b.kp, p, V::For).unwrap();
     env.warp(START + 100);
     let e = env.start_election().unwrap();
-    env.declare(&alice, e).unwrap();
+    env.declare(&alice, e, 0).unwrap();
     env.warp(START + 110);
     env.queue(DEL, p).unwrap();
     env.warp(START + 150);
     env.elect(&alice, e, vec![alice.kp.pubkey()]).unwrap();
     env.warp(START + 250);
     env.finalize_election(e).unwrap();
-    assert_eq!(env.del_governance().council, vec![alice.kp.pubkey()], "one candidate, one seat filled");
+    assert_eq!(env.del_governance().council, vec![alice.kp.pubkey(), b.kp.pubkey(), _c.kp.pubkey()], "alice takes seat 0; nobody ran for the others, so they keep their holders");
     assert_eq!(code(env.execute(DEL, p)), err(GovError::CouncilChanged));
     assert_eq!(env.del_state(p), ProposalState::Expired);
 }
@@ -189,7 +191,7 @@ fn members_recall_a_council_member() {
     env.queue(DEL, p).unwrap();
     env.finalize_recall(r).unwrap();
     assert!(env.recall(r).removed);
-    assert_eq!(env.del_governance().council, vec![a.kp.pubkey(), c.kp.pubkey()]);
+    assert_eq!(env.del_governance().council, vec![a.kp.pubkey(), Pubkey::default(), c.kp.pubkey()], "b's seat sits vacant");
     assert_eq!(code(env.finalize_recall(r)), err(GovError::AlreadyFinalized));
     assert_eq!(code(env.del_propose(&b.kp, vec![env.pay_sol(&b.kp.pubkey(), 1)])), err(GovError::NotCouncilMember));
 
@@ -283,4 +285,166 @@ fn a_token_weighted_dao_can_switch_to_delegate() {
     env.warp(t + 160);
     env.execute(DEL, p).unwrap();
     assert_eq!(env.lamports(&host), 4_000_000);
+}
+
+// ---- seats: ties drawn by ORAO ----
+
+fn tie_randomness(seed: &[u8; 32]) -> Pubkey {
+    Pubkey::find_program_address(&[del::ORAO_REQUEST_SEED, seed], &del::ORAO_VRF).0
+}
+
+/// ORAO's RandomnessV2 account: pending, or fulfilled with `randomness` (as in sortition.rs).
+fn set_orao(env: &mut Env, seed: &[u8; 32], randomness: Option<[u8; 64]>) {
+    let mut data = del::ORAO_RANDOMNESS_V2.to_vec();
+    let client = Pubkey::new_unique();
+    match randomness {
+        None => {
+            data.push(0);
+            data.extend_from_slice(client.as_ref());
+            data.extend_from_slice(seed);
+            data.extend_from_slice(&0u32.to_le_bytes());
+        }
+        Some(r) => {
+            data.push(1);
+            data.extend_from_slice(client.as_ref());
+            data.extend_from_slice(seed);
+            data.extend_from_slice(&r);
+        }
+    }
+    let account = solana_account::Account { lamports: 10_000_000, data, owner: del::ORAO_VRF, executable: false, rent_epoch: 0 };
+    env.svm.set_account(tie_randomness(seed), account).unwrap();
+}
+
+fn finalize_with(env: &mut Env, e: Pubkey, randomness: Pubkey) -> Result<(), FailedTransactionMetadata> {
+    let ix = Instruction {
+        program_id: DEL,
+        accounts: del::accounts::FinalizeElection { governance: env.governance(DEL), election: e, randomness: Some(randomness) }.to_account_metas(None),
+        data: del::instruction::FinalizeElection {}.data(),
+    };
+    let admin = env.admin.insecure_clone();
+    env.send(&[ix], &[&admin])
+}
+
+fn resolve(env: &mut Env, e: Pubkey, randomness: Pubkey) -> Result<(), FailedTransactionMetadata> {
+    let ix = Instruction {
+        program_id: DEL,
+        accounts: del::accounts::ResolveTies { governance: env.governance(DEL), election: e, randomness }.to_account_metas(None),
+        data: del::instruction::ResolveTies {}.data(),
+    };
+    let admin = env.admin.insecure_clone();
+    env.send(&[ix], &[&admin])
+}
+
+/// Alice and bob tie for seat 1 (600 each); dave has seat 0 alone.
+fn tied_election() -> (Env, Pubkey, [Pubkey; 3]) {
+    let Dao { mut env, alice, bob, .. } = delegate_dao(del_config());
+    let dave = env.member(1_000);
+    env.deposit(DEL, &dave, 300).unwrap();
+    env.warp(START + 1_000);
+    let e = env.start_election().unwrap();
+    env.declare(&alice, e, 1).unwrap();
+    env.declare(&bob, e, 1).unwrap();
+    env.declare(&dave, e, 0).unwrap();
+    env.warp(START + 1_050);
+    let [ka, kb, kd] = [&alice, &bob, &dave].map(|m| m.kp.pubkey());
+    env.elect(&alice, e, vec![ka, kd]).unwrap(); // 600 to alice
+    env.elect(&bob, e, vec![kb]).unwrap(); // 400 to bob
+    env.elect(&dave, e, vec![kb]).unwrap(); // 300: bob 700
+    (env, e, [ka, kb, kd])
+}
+
+#[test]
+fn a_tied_seat_is_drawn_by_orao() {
+    let Dao { mut env, alice, bob, .. } = delegate_dao(del_config());
+    let carol = env.member(1_000);
+    env.deposit(DEL, &carol, 600).unwrap();
+    env.warp(START + 1_000);
+    let e = env.start_election().unwrap();
+    env.declare(&alice, e, 2).unwrap();
+    env.declare(&carol, e, 2).unwrap();
+    env.warp(START + 1_050);
+    let [ka, kc] = [&alice, &carol].map(|m| m.kp.pubkey());
+    env.elect(&alice, e, vec![ka]).unwrap(); // 600
+    env.elect(&carol, e, vec![kc]).unwrap(); // 600: a tie
+    let _ = &bob;
+    env.warp(START + 1_150);
+
+    let seed = del::tie_seed(&env.governance(DEL), env.election(e).id);
+    let randomness = tie_randomness(&seed);
+    assert_eq!(code(env.finalize_election(e)), err(GovError::WrongRandomnessAccount), "a tie needs ORAO's request");
+    set_orao(&mut env, &seed, None);
+    finalize_with(&mut env, e, randomness).unwrap();
+    assert!(env.election(e).awaiting_draw);
+    assert_eq!(code(resolve(&mut env, e, randomness)), err(GovError::RandomnessNotReady));
+
+    // Randomness that picks the second tied candidate (carol).
+    let mut r = [0u8; 64];
+    loop {
+        let h = solana_sha256_hasher::hashv(&[&r, &[2u8]]).to_bytes();
+        if u64::from_le_bytes(h[..8].try_into().unwrap()) % 2 == 1 {
+            break;
+        }
+        r[0] += 1;
+    }
+    set_orao(&mut env, &seed, Some(r));
+    resolve(&mut env, e, randomness).unwrap();
+    let g = env.del_governance();
+    assert_eq!(g.council[2], kc);
+    assert_eq!(g.council_term, 2);
+}
+
+#[test]
+fn a_tie_orao_never_draws_goes_to_the_first_to_declare() {
+    let Dao { mut env, alice, .. } = delegate_dao(del_config());
+    let carol = env.member(1_000);
+    env.deposit(DEL, &carol, 600).unwrap();
+    env.warp(START + 1_000);
+    let e = env.start_election().unwrap();
+    env.declare(&alice, e, 0).unwrap();
+    env.declare(&carol, e, 0).unwrap();
+    env.warp(START + 1_050);
+    let [ka, kc] = [&alice, &carol].map(|m| m.kp.pubkey());
+    env.elect(&alice, e, vec![ka]).unwrap();
+    env.elect(&carol, e, vec![kc]).unwrap();
+    env.warp(START + 1_150);
+    let seed = del::tie_seed(&env.governance(DEL), env.election(e).id);
+    set_orao(&mut env, &seed, None);
+    finalize_with(&mut env, e, tie_randomness(&seed)).unwrap();
+    env.warp(START + 1_150 + del::TIE_DRAW_TIMEOUT);
+    resolve(&mut env, e, tie_randomness(&seed)).unwrap();
+    assert_eq!(env.del_governance().council[0], ka);
+}
+
+#[test]
+fn no_tie_needs_no_draw() {
+    let (mut env, e, [_ka, kb, kd]) = tied_election();
+    env.warp(START + 1_150);
+    env.finalize_election(e).unwrap();
+    let g = env.del_governance();
+    assert_eq!((g.council[0], g.council[1]), (kd, kb), "bob 700 beats alice 600 for seat 1");
+
+}
+
+#[test]
+fn seat_labels_need_a_proposal() {
+    let Dao { mut env, council: [a, b, _c], .. } = delegate_dao(del_config());
+    let governance = env.governance(DEL);
+    let label = |signer: Pubkey| Instruction {
+        program_id: DEL,
+        accounts: del::accounts::UpdateConfig { treasury: signer, governance }.to_account_metas(None),
+        data: del::instruction::SetSeatLabel { seat: 0, label: "Treasurer".into() }.data(),
+    };
+    let stranger = Keypair::new();
+    env.svm.airdrop(&stranger.pubkey(), 1_000_000_000).unwrap();
+    assert_eq!(code(env.send(&[label(stranger.pubkey())], &[&stranger])), err(GovError::Unauthorized));
+
+    let p = env.del_propose(&a.kp, vec![stored(label(env.treasury))]).unwrap();
+    env.warp(START + 10);
+    env.council_vote(&a.kp, p, V::For).unwrap();
+    env.council_vote(&b.kp, p, V::For).unwrap();
+    env.warp(START + 110);
+    env.queue(DEL, p).unwrap();
+    env.warp(START + 160);
+    env.execute(DEL, p).unwrap();
+    assert_eq!(env.del_governance().seat_labels[0], "Treasurer");
 }

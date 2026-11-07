@@ -39,9 +39,27 @@ pub const TREASURY_SEED: &[u8] = b"treasury";
 /// `confirm_execution` call, so a governance program knows the hub, and
 /// nobody else, is asking.
 pub const EXECUTOR_SEED: &[u8] = b"executor";
-/// Governance-program PDA `[GOVERNANCE_SEED, hub_dao]`: a DAO's state in
-/// that governance program (rules, counts, vault...).
+/// Governance-program PDA `[GOVERNANCE_SEED, hub_dao, epoch (u32 LE)]`: a
+/// DAO's state in that governance program (rules, counts...) for one hub
+/// epoch. Every switch sets up a fresh one.
 pub const GOVERNANCE_SEED: &[u8] = b"governance";
+
+/// The vortex-stake program: every DAO's stake pools.
+pub const STAKE_PROGRAM_ID: Pubkey = pubkey!("7T27h8r13Xmp1m4vQbHFfs1xTqdQaHnxW7ybHvwjqKAd");
+/// Stake PDA `[POOL_SEED, hub_dao, mint]`: a DAO's stake pool for one token.
+pub const POOL_SEED: &[u8] = b"pool";
+/// Stake PDA `[STAKE_SEED, pool, owner]`: one member's stake in a pool.
+pub const STAKE_SEED: &[u8] = b"stake";
+
+/// A DAO's stake pool for `mint`.
+pub fn pool_address(hub_dao: &Pubkey, mint: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[POOL_SEED, hub_dao.as_ref(), mint.as_ref()], &STAKE_PROGRAM_ID).0
+}
+
+/// `owner`'s stake in `pool`.
+pub fn stake_address(pool: &Pubkey, owner: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[STAKE_SEED, pool.as_ref(), owner.as_ref()], &STAKE_PROGRAM_ID).0
+}
 
 /// The instruction every governance program implements for the hub.
 /// Accounts, in order: the hub's executor PDA (signer), the governance
@@ -310,6 +328,86 @@ pub enum GovError {
     // Hub token record
     #[msg("That isn't the DAO's token: change it with the hub's set_dao_token first")]
     WrongMint,
+    // Stake pools
+    #[msg("That pool isn't the DAO's current one: it only takes withdrawals")]
+    PoolNotCurrent,
+    #[msg("That stake is in another pool")]
+    WrongPool,
+    #[msg("This converter is closed")]
+    ConverterClosed,
+    #[msg("The converter doesn't hold enough of the new token for that")]
+    ConverterUnderfunded,
+    // Security council
+    #[msg("The DAO has no security council")]
+    NoCouncil,
+    #[msg("Only the security council can do this")]
+    NotCouncilSigner,
+    #[msg("This proposal is waiting for the security council")]
+    AwaitingCouncil,
+    #[msg("The security council rejected this proposal")]
+    CouncilRejected,
+    #[msg("The council's tenure hasn't ended")]
+    TenureNotOver,
+    // Allowances
+    #[msg("An allowance needs an amount and an end within a year")]
+    InvalidAllowance,
+    #[msg("This allowance has ended or been revoked")]
+    AllowanceEnded,
+    #[msg("This period's allowance has already been paid; the next opens 30 days after it")]
+    AllowanceAlreadyClaimed,
+    // Council seats
+    #[msg("There's no such seat on the council")]
+    InvalidSeat,
+    #[msg("Pick at most one candidate per seat")]
+    OneCandidatePerSeat,
+    // Distributor and raises
+    #[msg("The Distributor doesn't hold enough unpromised tokens for that")]
+    NotFunded,
+    #[msg("Welcome grants are off, used up, or already given to this member")]
+    WelcomeUnavailable,
+    #[msg("The Distributor is closed")]
+    DistributorClosed,
+    #[msg("Not yet: the claim deadline hasn't passed")]
+    TooEarly,
+    #[msg("The raise isn't taking contributions now")]
+    RaiseNotOpen,
+    #[msg("That's outside this raise's contribution limits")]
+    ContributionLimit,
+    #[msg("The raise hasn't ended")]
+    RaiseNotEnded,
+    #[msg("The time to accept an amount has passed: everyone is refunded")]
+    DecisionClosed,
+    #[msg("The raise was already accepted")]
+    AlreadyAccepted,
+    #[msg("Accept at least the soft cap and at most what was contributed")]
+    AmountOutOfRange,
+    #[msg("The raise hasn't been accepted")]
+    NotAccepted,
+    // ---- prop-firm vaults ----
+    #[msg("Moves are frozen ahead of the vault's next window")]
+    MovesFrozen,
+    #[msg("The vault's window isn't due yet")]
+    WindowNotDue,
+    #[msg("Money is still settling: the window waits after the last move")]
+    Settling,
+    #[msg("A venue's price is stale: the window waits")]
+    StalePrice,
+    #[msg("That epoch hasn't been processed yet")]
+    NotProcessed,
+    #[msg("The vault doesn't hold enough idle money yet")]
+    NotLiquid,
+    #[msg("The vault was already seeded")]
+    AlreadySeeded,
+    #[msg("The vault is worth nothing: deposits can't be priced")]
+    VaultEmpty,
+    #[msg("A venue account holds collateral the vault can't value")]
+    UnsupportedCollateral,
+    #[msg("The venue accounts given aren't the vault's, in its order")]
+    VenueMismatch,
+    #[msg("Only addresses the DAO allowed may deposit")]
+    NotAllowed,
+    #[msg("Fees are still owed to a recipient being changed")]
+    FeesOwed,
 }
 
 /// A DAO's voting rules. Times are in seconds.

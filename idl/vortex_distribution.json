@@ -1,0 +1,2083 @@
+{
+  "address": "4FeTS89hg2BtrkV2vN73be93bVvokBRHR7gbC6uUJgAq",
+  "metadata": {
+    "name": "vortex_distribution",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Vortexes distribution: a DAO's Distributor (every token it has promised, with vesting, claimable from the member's chat account) and its raises (pro-rata fundraises paying only into the DAO's treasury)."
+  },
+  "instructions": [
+    {
+      "name": "accept",
+      "docs": [
+        "The decider accepts `amount` (from the soft cap up to everything",
+        "contributed, no upper limit); it goes to the DAO's treasury, or for a",
+        "prop firm into its vault, whose first shares go to the Distributor."
+      ],
+      "discriminator": [
+        65,
+        150,
+        70,
+        216,
+        133,
+        6,
+        107,
+        4
+      ],
+      "accounts": [
+        {
+          "name": "decider",
+          "signer": true
+        },
+        {
+          "name": "raise",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "The DAO's treasury: where the money goes, and nowhere else."
+          ]
+        },
+        {
+          "name": "treasury_token",
+          "docs": [
+            "Where the money goes, unless the raise is a prop firm's."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "distributor"
+        },
+        {
+          "name": "distributor_vault",
+          "writable": true
+        },
+        {
+          "name": "prop_firm_vault",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "vault_assets",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "share_mint",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "share_token_program",
+          "optional": true
+        },
+        {
+          "name": "vault_program",
+          "optional": true
+        },
+        {
+          "name": "currency"
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "allocate",
+      "docs": [
+        "Promises `amount` to `owner` and/or `account`, vesting from `start`:",
+        "nothing before `start + cliff`, then linearly until `start +",
+        "duration`. Only a passed proposal (the treasury)."
+      ],
+      "discriminator": [
+        64,
+        38,
+        189,
+        129,
+        24,
+        157,
+        82,
+        136
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "docs": [
+            "The DAO's treasury: a passed proposal. It pays the rent."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "distributor",
+          "writable": true
+        },
+        {
+          "name": "vault"
+        },
+        {
+          "name": "allocation",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "owner",
+          "type": "pubkey"
+        },
+        {
+          "name": "account",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "start",
+          "type": "i64"
+        },
+        {
+          "name": "cliff",
+          "type": "i64"
+        },
+        {
+          "name": "duration",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "claim",
+      "docs": [
+        "The owner claims what has vested, into a token account of theirs."
+      ],
+      "discriminator": [
+        62,
+        198,
+        214,
+        193,
+        213,
+        159,
+        108,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "distributor",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "allocation",
+          "writable": true
+        },
+        {
+          "name": "to",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "claim_for",
+      "docs": [
+        "The operator claims an account's vested tokens into the member's",
+        "current wallet (`to`), having checked who they are."
+      ],
+      "discriminator": [
+        245,
+        67,
+        97,
+        44,
+        59,
+        223,
+        144,
+        1
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "distributor",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "allocation",
+          "writable": true
+        },
+        {
+          "name": "to",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_distributor",
+      "docs": [
+        "After the claim deadline: closes the Distributor and returns",
+        "everything still in it to the treasury. Only a passed proposal."
+      ],
+      "discriminator": [
+        202,
+        56,
+        180,
+        143,
+        46,
+        104,
+        106,
+        112
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "distributor",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "treasury_token",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "contribute",
+      "docs": [
+        "Contributes `amount`, tied to the contributor's chat `account` if",
+        "given (the same account on every contribution from this wallet)."
+      ],
+      "discriminator": [
+        82,
+        33,
+        68,
+        131,
+        32,
+        0,
+        205,
+        95
+      ],
+      "accounts": [
+        {
+          "name": "contributor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "raise",
+          "writable": true
+        },
+        {
+          "name": "contribution",
+          "writable": true
+        },
+        {
+          "name": "from",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "currency"
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "account",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_distributor",
+      "docs": [
+        "Opens the Distributor of `mint` for a DAO, run by `operator`. Anyone",
+        "(it holds nothing until the DAO funds it)."
+      ],
+      "discriminator": [
+        184,
+        103,
+        26,
+        71,
+        141,
+        64,
+        49,
+        177
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "hub_dao"
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "distributor",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "operator",
+          "type": "pubkey"
+        },
+        {
+          "name": "claim_deadline",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "create_raise",
+      "docs": [
+        "Opens a raise for a DAO, paying into its treasury and selling tokens",
+        "the `distributor` holds. `decider` accepts the amount: the founder of",
+        "a new DAO, or the DAO's treasury (then by proposal). Anyone can open",
+        "one; contributors see the DAO, its rules and its treasury first.",
+        "",
+        "For a prop firm, `prop_firm_vault` is the DAO's vault, made with this",
+        "raise as its seeder; `sale_supply` is then 0 and set at acceptance to",
+        "the shares the vault mints."
+      ],
+      "discriminator": [
+        234,
+        185,
+        148,
+        199,
+        102,
+        231,
+        133,
+        210
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "create_key",
+          "signer": true
+        },
+        {
+          "name": "hub_dao"
+        },
+        {
+          "name": "distributor"
+        },
+        {
+          "name": "currency"
+        },
+        {
+          "name": "raise",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "prop_firm_vault",
+          "docs": [
+            "A prop firm's vault, seeded by this raise."
+          ],
+          "optional": true
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "terms",
+          "type": {
+            "defined": {
+              "name": "RaiseTerms"
+            }
+          }
+        },
+        {
+          "name": "decider",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "grant_welcome",
+      "docs": [
+        "A member of the DAO's Delegate council grants a new member their",
+        "welcome tokens, once they've checked the member paid their dues or",
+        "registered. One per `key` (the account, or the wallet when there's none)."
+      ],
+      "discriminator": [
+        200,
+        84,
+        96,
+        103,
+        38,
+        226,
+        52,
+        35
+      ],
+      "accounts": [
+        {
+          "name": "approver",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "hub_dao"
+        },
+        {
+          "name": "governance",
+          "docs": [
+            "The DAO's current Delegate governance."
+          ]
+        },
+        {
+          "name": "distributor",
+          "writable": true
+        },
+        {
+          "name": "vault"
+        },
+        {
+          "name": "welcomed",
+          "writable": true
+        },
+        {
+          "name": "allocation",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "member",
+          "type": "pubkey"
+        },
+        {
+          "name": "account",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "return_unpromised",
+      "docs": [
+        "Sends what nobody's been promised back to the treasury. Only a passed proposal."
+      ],
+      "discriminator": [
+        84,
+        253,
+        192,
+        119,
+        245,
+        141,
+        224,
+        200
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "distributor",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "treasury_token",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "set_welcome",
+      "docs": [
+        "Turns welcome grants on (amount above 0) or off, and caps their",
+        "total. Only a passed proposal."
+      ],
+      "discriminator": [
+        113,
+        100,
+        188,
+        58,
+        187,
+        118,
+        53,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "distributor",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "cap",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "settle",
+      "docs": [
+        "After acceptance: writes one contributor's tokens into the",
+        "Distributor (vesting as the terms say) and records their refund.",
+        "Anyone; the caller pays for the allocation account."
+      ],
+      "discriminator": [
+        175,
+        42,
+        185,
+        87,
+        144,
+        131,
+        102,
+        212
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "raise"
+        },
+        {
+          "name": "contribution",
+          "writable": true
+        },
+        {
+          "name": "distributor",
+          "writable": true
+        },
+        {
+          "name": "distributor_vault"
+        },
+        {
+          "name": "allocation",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdraw_refund",
+      "docs": [
+        "Pays a contributor what they're owed back, into their own token",
+        "account: everything if the raise failed, else the part not accepted",
+        "(once settled). Anyone."
+      ],
+      "discriminator": [
+        220,
+        99,
+        224,
+        50,
+        13,
+        71,
+        215,
+        101
+      ],
+      "accounts": [
+        {
+          "name": "raise"
+        },
+        {
+          "name": "contribution",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "to",
+          "docs": [
+            "The contributor's own token account."
+          ],
+          "writable": true
+        },
+        {
+          "name": "currency"
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Allocation",
+      "discriminator": [
+        147,
+        154,
+        3,
+        177,
+        155,
+        25,
+        131,
+        176
+      ]
+    },
+    {
+      "name": "Contribution",
+      "discriminator": [
+        182,
+        187,
+        14,
+        111,
+        72,
+        167,
+        242,
+        212
+      ]
+    },
+    {
+      "name": "Distributor",
+      "discriminator": [
+        90,
+        90,
+        217,
+        147,
+        6,
+        32,
+        135,
+        4
+      ]
+    },
+    {
+      "name": "Raise",
+      "discriminator": [
+        253,
+        96,
+        15,
+        240,
+        65,
+        242,
+        192,
+        103
+      ]
+    },
+    {
+      "name": "Welcomed",
+      "discriminator": [
+        139,
+        18,
+        30,
+        163,
+        85,
+        209,
+        248,
+        178
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "Allocated",
+      "discriminator": [
+        146,
+        11,
+        194,
+        76,
+        4,
+        220,
+        226,
+        43
+      ]
+    },
+    {
+      "name": "Claimed",
+      "discriminator": [
+        217,
+        192,
+        123,
+        72,
+        108,
+        150,
+        248,
+        33
+      ]
+    },
+    {
+      "name": "Contributed",
+      "discriminator": [
+        196,
+        199,
+        157,
+        136,
+        180,
+        222,
+        100,
+        118
+      ]
+    },
+    {
+      "name": "DistributorCreated",
+      "discriminator": [
+        46,
+        236,
+        214,
+        20,
+        159,
+        117,
+        177,
+        233
+      ]
+    },
+    {
+      "name": "RaiseAccepted",
+      "discriminator": [
+        33,
+        151,
+        190,
+        201,
+        20,
+        243,
+        55,
+        20
+      ]
+    },
+    {
+      "name": "RaiseCreated",
+      "discriminator": [
+        242,
+        93,
+        21,
+        59,
+        238,
+        47,
+        195,
+        85
+      ]
+    },
+    {
+      "name": "Refunded",
+      "discriminator": [
+        35,
+        103,
+        149,
+        246,
+        196,
+        123,
+        221,
+        99
+      ]
+    },
+    {
+      "name": "Settled",
+      "discriminator": [
+        232,
+        210,
+        40,
+        17,
+        142,
+        124,
+        145,
+        238
+      ]
+    },
+    {
+      "name": "WelcomeGranted",
+      "discriminator": [
+        16,
+        46,
+        84,
+        207,
+        110,
+        199,
+        113,
+        21
+      ]
+    },
+    {
+      "name": "WelcomeTermsSet",
+      "discriminator": [
+        66,
+        13,
+        225,
+        186,
+        238,
+        13,
+        137,
+        165
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "Allocated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "distributor",
+            "type": "pubkey"
+          },
+          {
+            "name": "allocation",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "account",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "start",
+            "type": "i64"
+          },
+          {
+            "name": "cliff",
+            "type": "i64"
+          },
+          {
+            "name": "duration",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Allocation",
+      "docs": [
+        "`[ALLOCATION_SEED, distributor, id]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "distributor",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "owner",
+            "docs": [
+              "The wallet that may claim (default: none)."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "account",
+            "docs": [
+              "The chat account the operator may claim for (zero: none)."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          },
+          {
+            "name": "claimed",
+            "type": "u64"
+          },
+          {
+            "name": "start",
+            "type": "i64"
+          },
+          {
+            "name": "cliff",
+            "type": "i64"
+          },
+          {
+            "name": "duration",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Claimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "allocation",
+            "type": "pubkey"
+          },
+          {
+            "name": "to",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Contributed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "raise",
+            "type": "pubkey"
+          },
+          {
+            "name": "contributor",
+            "type": "pubkey"
+          },
+          {
+            "name": "account",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Contribution",
+      "docs": [
+        "`[CONTRIBUTION_SEED, raise, contributor]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "raise",
+            "type": "pubkey"
+          },
+          {
+            "name": "contributor",
+            "type": "pubkey"
+          },
+          {
+            "name": "account",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "settled",
+            "type": "bool"
+          },
+          {
+            "name": "refund_owed",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Council",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "signers",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "required",
+            "docs": [
+              "How many signers must confirm."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "tenure",
+            "docs": [
+              "Seconds after `seated_at` before the DAO can replace the signers",
+              "without their confirmation."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "seated_at",
+            "type": "i64"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Goes up with every change, so approvals given to an earlier council",
+              "don't count."
+            ],
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Dao",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "create_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "governance_program",
+            "docs": [
+              "The governance program running the DAO now."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "governance",
+            "docs": [
+              "The DAO's account in that program: `[GOVERNANCE_SEED, dao, epoch]` there."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "Starts at 1 and goes up with every switch. Proposals only run in",
+              "the epoch they were made in."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "pending_switch",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PendingSwitch"
+                }
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "treasury_bump",
+            "type": "u8"
+          },
+          {
+            "name": "executor_bump",
+            "type": "u8"
+          },
+          {
+            "name": "council",
+            "docs": [
+              "The security council, when on."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Council"
+                }
+              }
+            }
+          },
+          {
+            "name": "allowance_count",
+            "docs": [
+              "How many allowances this DAO has granted (the latest id)."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DelegateConfig",
+      "docs": [
+        "A DAO's rules. Times in seconds; amounts in raw tokens."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "council_size",
+            "docs": [
+              "Seats on the council."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "term_length",
+            "docs": [
+              "How long a council serves before an election can start."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "candidacy_threshold",
+            "docs": [
+              "Deposit needed to stand for election or start a recall."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "candidacy_period",
+            "docs": [
+              "How long candidates can declare after an election starts."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "election_voting_period",
+            "docs": [
+              "How long election voting lasts, after candidacy closes."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "council_quorum",
+            "docs": [
+              "Council votes (for + against + abstain) a proposal needs."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "council_approval_bps",
+            "docs": [
+              "Share of for / (for + against) among council votes needed to pass."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "voting_delay",
+            "type": "u32"
+          },
+          {
+            "name": "voting_period",
+            "type": "u32"
+          },
+          {
+            "name": "timelock",
+            "type": "u32"
+          },
+          {
+            "name": "execution_period",
+            "type": "u32"
+          },
+          {
+            "name": "recall_quorum_bps",
+            "docs": [
+              "Share of all deposits (when the recall started) that must vote."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "recall_approval_bps",
+            "type": "u16"
+          },
+          {
+            "name": "recall_voting_period",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Distributor",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "docs": [
+              "The bot's operator: claims for chat accounts."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "outstanding",
+            "docs": [
+              "Tokens promised and not yet claimed."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "allocation_count",
+            "type": "u64"
+          },
+          {
+            "name": "claim_deadline",
+            "docs": [
+              "After this the DAO may close it and take everything back (0: never)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "closed",
+            "type": "bool"
+          },
+          {
+            "name": "welcome_amount",
+            "type": "u64"
+          },
+          {
+            "name": "welcome_cap",
+            "type": "u64"
+          },
+          {
+            "name": "welcome_granted",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DistributorCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "distributor",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "operator",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeSplit",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "bps",
+            "type": "u16"
+          },
+          {
+            "name": "owed",
+            "docs": [
+              "Fee shares (in the escrow) not yet claimed."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Governance",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "hub_dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "executor",
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "DelegateConfig"
+              }
+            }
+          },
+          {
+            "name": "council",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "council_term",
+            "docs": [
+              "Goes up each time an election seats a council."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "term_ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "election_count",
+            "type": "u64"
+          },
+          {
+            "name": "election_open",
+            "type": "bool"
+          },
+          {
+            "name": "proposal_count",
+            "type": "u64"
+          },
+          {
+            "name": "recall_count",
+            "type": "u64"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "The hub epoch this setup is for (part of its address)."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "seat_labels",
+            "docs": [
+              "Seat names, by seat (set by proposal; may be shorter than the council)."
+            ],
+            "type": {
+              "vec": "string"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "PendingSwitch",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program",
+            "type": "pubkey"
+          },
+          {
+            "name": "ready_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Raise",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "create_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "decider",
+            "type": "pubkey"
+          },
+          {
+            "name": "currency",
+            "type": "pubkey"
+          },
+          {
+            "name": "currency_token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "distributor",
+            "type": "pubkey"
+          },
+          {
+            "name": "prop_firm_vault",
+            "docs": [
+              "A prop firm's vault the money goes into; default: the treasury."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "terms",
+            "type": {
+              "defined": {
+                "name": "RaiseTerms"
+              }
+            }
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          },
+          {
+            "name": "accepted",
+            "type": "u64"
+          },
+          {
+            "name": "accepted_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RaiseAccepted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "raise",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RaiseCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "raise",
+            "type": "pubkey"
+          },
+          {
+            "name": "decider",
+            "type": "pubkey"
+          },
+          {
+            "name": "currency",
+            "type": "pubkey"
+          },
+          {
+            "name": "terms",
+            "type": {
+              "defined": {
+                "name": "RaiseTerms"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "RaiseTerms",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "soft_cap",
+            "type": "u64"
+          },
+          {
+            "name": "hard_cap",
+            "docs": [
+              "The stated target; not a ceiling."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "start",
+            "type": "i64"
+          },
+          {
+            "name": "end",
+            "type": "i64"
+          },
+          {
+            "name": "min_contribution",
+            "type": "u64"
+          },
+          {
+            "name": "max_contribution",
+            "docs": [
+              "Per contributor; 0: none."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "sale_supply",
+            "docs": [
+              "Tokens shared among contributors, held by the Distributor."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "vest_cliff",
+            "type": "i64"
+          },
+          {
+            "name": "vest_duration",
+            "type": "i64"
+          },
+          {
+            "name": "decision_window",
+            "docs": [
+              "After `end`, how long the decider has to accept an amount."
+            ],
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Refunded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "raise",
+            "type": "pubkey"
+          },
+          {
+            "name": "contributor",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Settled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "raise",
+            "type": "pubkey"
+          },
+          {
+            "name": "contributor",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokens",
+            "type": "u64"
+          },
+          {
+            "name": "refund",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Vault",
+      "docs": [
+        "`[VAULT_SEED, dao]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_decimals",
+            "type": "u8"
+          },
+          {
+            "name": "share_mint",
+            "docs": [
+              "The DAO's token; the vault is its only minter."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "share_token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "assets",
+            "docs": [
+              "Idle money: `[ASSETS_SEED, vault]`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "escrow",
+            "docs": [
+              "Shares waiting to be redeemed or claimed, and fee shares owed: `[ESCROW_SEED, vault]`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "seeder",
+            "docs": [
+              "May seed the vault once (a launch's raise); default: nobody."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "config",
+            "type": {
+              "defined": {
+                "name": "VaultConfig"
+              }
+            }
+          },
+          {
+            "name": "fee_splits",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "FeeSplit"
+                }
+              }
+            }
+          },
+          {
+            "name": "perp_asset_map",
+            "type": "pubkey"
+          },
+          {
+            "name": "phoenix_traders",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "extra_tokens",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "The open epoch: requests made now are priced at its window."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "next_window_at",
+            "type": "i64"
+          },
+          {
+            "name": "last_move_at",
+            "type": "i64"
+          },
+          {
+            "name": "last_fee_at",
+            "type": "i64"
+          },
+          {
+            "name": "high_water",
+            "docs": [
+              "The best share price after fees so far (asset units per share unit, times ONE)."
+            ],
+            "type": "u128"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "seeded",
+            "type": "bool"
+          },
+          {
+            "name": "pending_deposit_assets",
+            "docs": [
+              "In the open epoch."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "owed_assets",
+            "docs": [
+              "Redemptions priced, not yet paid."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "initial_rate",
+            "docs": [
+              "Share units per asset unit for the first deposit (one share per asset)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "interval",
+            "docs": [
+              "Seconds between windows, e.g. 30 days."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "freeze_before",
+            "docs": [
+              "No moves this long before a window."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "settle_delay",
+            "docs": [
+              "A window waits this long after the last move."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "management_bps",
+            "docs": [
+              "Per year, of the vault's value."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "performance_bps",
+            "docs": [
+              "Of gains above the high water mark."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "max_drawdown_bps",
+            "docs": [
+              "Below the high water mark that pauses trading; 0: off."
+            ],
+            "type": "u16"
+          },
+          {
+            "name": "open_to_all",
+            "docs": [
+              "False: only addresses the DAO allowed may deposit."
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "max_price_age_slots",
+            "docs": [
+              "The oldest Phoenix mark price a valuation accepts, in slots."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WelcomeGranted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "distributor",
+            "type": "pubkey"
+          },
+          {
+            "name": "member",
+            "type": "pubkey"
+          },
+          {
+            "name": "account",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "approver",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WelcomeTermsSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "distributor",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "cap",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Welcomed",
+      "docs": [
+        "`[WELCOMED_SEED, distributor, key]`: one welcome grant per member."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

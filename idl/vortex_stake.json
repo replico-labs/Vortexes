@@ -1,0 +1,1231 @@
+{
+  "address": "7T27h8r13Xmp1m4vQbHFfs1xTqdQaHnxW7ybHvwjqKAd",
+  "metadata": {
+    "name": "vortex_stake",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Vortexes stake: one stake pool per DAO per token. Members stake once; every governance model the DAO switches to reads voting power from the same pool, and a token change opens a new pool while the old one keeps paying out."
+  },
+  "instructions": [
+    {
+      "name": "close_converter",
+      "docs": [
+        "Closes a converter and returns what's left in it to the treasury.",
+        "Only a passed proposal."
+      ],
+      "discriminator": [
+        42,
+        84,
+        137,
+        241,
+        42,
+        213,
+        215,
+        202
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "converter",
+          "writable": true
+        },
+        {
+          "name": "converter_vault",
+          "writable": true
+        },
+        {
+          "name": "treasury_account",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "convert",
+      "docs": [
+        "Converts `amount` of the member's unlocked stake in the old pool into",
+        "stake in the current one, at the converter's rate. The old tokens go",
+        "to the treasury; the new ones come out of the converter."
+      ],
+      "discriminator": [
+        122,
+        80,
+        212,
+        208,
+        92,
+        200,
+        34,
+        161
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "converter"
+        },
+        {
+          "name": "converter_vault",
+          "writable": true
+        },
+        {
+          "name": "from_pool",
+          "writable": true
+        },
+        {
+          "name": "from_stake",
+          "writable": true
+        },
+        {
+          "name": "from_vault",
+          "writable": true
+        },
+        {
+          "name": "from_mint"
+        },
+        {
+          "name": "treasury_from_account",
+          "docs": [
+            "The treasury's account for the old token: it gets what's converted."
+          ],
+          "writable": true
+        },
+        {
+          "name": "to_pool",
+          "writable": true
+        },
+        {
+          "name": "to_stake",
+          "writable": true
+        },
+        {
+          "name": "to_vault",
+          "writable": true
+        },
+        {
+          "name": "to_mint"
+        },
+        {
+          "name": "from_token_program"
+        },
+        {
+          "name": "to_token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "create_pool",
+      "docs": [
+        "Opens a DAO's pool for `mint`. Anyone can: a pool only matters once",
+        "the hub's token record points at it."
+      ],
+      "discriminator": [
+        233,
+        146,
+        209,
+        142,
+        207,
+        104,
+        64,
+        188
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "hub_dao"
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "pool",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "lock",
+      "docs": [
+        "Locks `amount` of the member's stake for the DAO's current",
+        "governance, which signs, with the member."
+      ],
+      "discriminator": [
+        21,
+        19,
+        208,
+        43,
+        237,
+        62,
+        255,
+        87
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "signer": true
+        },
+        {
+          "name": "hub_dao"
+        },
+        {
+          "name": "pool"
+        },
+        {
+          "name": "stake",
+          "writable": true
+        },
+        {
+          "name": "lock",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "lock_until",
+      "docs": [
+        "Holds the member's whole stake until `until` (the end of a vote they",
+        "cast). Signed by the member and the DAO's current governance."
+      ],
+      "discriminator": [
+        226,
+        134,
+        227,
+        134,
+        236,
+        91,
+        158,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "governance",
+          "docs": [
+            "The DAO's current governance account (a PDA its program signs for)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "hub_dao"
+        },
+        {
+          "name": "pool"
+        },
+        {
+          "name": "stake",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "until",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "open_converter",
+      "docs": [
+        "Opens a converter from an old pool into the DAO's current one, at",
+        "`rate_num / rate_den` new tokens per old, and moves `fund` new tokens",
+        "from the treasury into its vault (0 to fund it later by a plain",
+        "transfer). Only a passed proposal (the treasury signs and pays rent).",
+        "Funding here keeps a token change with its converter small enough",
+        "for one proposal transaction."
+      ],
+      "discriminator": [
+        202,
+        69,
+        255,
+        88,
+        78,
+        223,
+        48,
+        116
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "docs": [
+            "The DAO's treasury: a passed proposal. It pays the rent."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "hub_dao"
+        },
+        {
+          "name": "dao_token"
+        },
+        {
+          "name": "from_pool"
+        },
+        {
+          "name": "to_pool",
+          "docs": [
+            "Converters only pay into the current pool."
+          ]
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "converter",
+          "writable": true
+        },
+        {
+          "name": "converter_vault",
+          "writable": true
+        },
+        {
+          "name": "treasury_account",
+          "docs": [
+            "The treasury's account for the new token, when `fund` is above 0."
+          ],
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "rate_num",
+          "type": "u64"
+        },
+        {
+          "name": "rate_den",
+          "type": "u64"
+        },
+        {
+          "name": "fund",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "stake",
+      "docs": [
+        "Stakes `amount` into the DAO's current pool."
+      ],
+      "discriminator": [
+        206,
+        176,
+        202,
+        18,
+        200,
+        209,
+        179,
+        108
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true
+        },
+        {
+          "name": "dao_token",
+          "docs": [
+            "The hub's token record for the pool's DAO: names the current pool."
+          ]
+        },
+        {
+          "name": "stake",
+          "writable": true
+        },
+        {
+          "name": "owner_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program"
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "unlock",
+      "docs": [
+        "Releases `amount` the signing governance locked earlier. Works after",
+        "the DAO has switched away from it."
+      ],
+      "discriminator": [
+        101,
+        155,
+        40,
+        21,
+        158,
+        189,
+        56,
+        203
+      ],
+      "accounts": [
+        {
+          "name": "governance",
+          "signer": true
+        },
+        {
+          "name": "stake",
+          "writable": true
+        },
+        {
+          "name": "lock",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "docs": [
+        "Takes `amount` back out of any of the DAO's pools: whatever isn't",
+        "locked, once every vote it was locked for has ended."
+      ],
+      "discriminator": [
+        183,
+        18,
+        70,
+        156,
+        148,
+        109,
+        161,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "writable": true
+        },
+        {
+          "name": "stake",
+          "writable": true
+        },
+        {
+          "name": "owner_token_account",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "token_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Converter",
+      "discriminator": [
+        145,
+        47,
+        19,
+        100,
+        193,
+        211,
+        81,
+        72
+      ]
+    },
+    {
+      "name": "LockRecord",
+      "discriminator": [
+        157,
+        145,
+        17,
+        26,
+        171,
+        35,
+        61,
+        131
+      ]
+    },
+    {
+      "name": "Pool",
+      "discriminator": [
+        241,
+        154,
+        109,
+        4,
+        17,
+        177,
+        109,
+        188
+      ]
+    },
+    {
+      "name": "Stake",
+      "discriminator": [
+        150,
+        197,
+        176,
+        29,
+        55,
+        132,
+        112,
+        149
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "Converted",
+      "discriminator": [
+        48,
+        254,
+        146,
+        135,
+        50,
+        134,
+        136,
+        167
+      ]
+    },
+    {
+      "name": "ConverterClosed",
+      "discriminator": [
+        196,
+        84,
+        174,
+        96,
+        0,
+        108,
+        192,
+        2
+      ]
+    },
+    {
+      "name": "ConverterOpened",
+      "discriminator": [
+        160,
+        183,
+        86,
+        56,
+        60,
+        2,
+        157,
+        110
+      ]
+    },
+    {
+      "name": "Locked",
+      "discriminator": [
+        188,
+        53,
+        118,
+        62,
+        64,
+        12,
+        198,
+        84
+      ]
+    },
+    {
+      "name": "LockedUntil",
+      "discriminator": [
+        154,
+        187,
+        113,
+        136,
+        221,
+        60,
+        64,
+        250
+      ]
+    },
+    {
+      "name": "PoolCreated",
+      "discriminator": [
+        202,
+        44,
+        41,
+        88,
+        104,
+        220,
+        157,
+        82
+      ]
+    },
+    {
+      "name": "Staked",
+      "discriminator": [
+        11,
+        146,
+        45,
+        205,
+        230,
+        58,
+        213,
+        240
+      ]
+    },
+    {
+      "name": "Unlocked",
+      "discriminator": [
+        219,
+        104,
+        74,
+        123,
+        174,
+        92,
+        182,
+        120
+      ]
+    },
+    {
+      "name": "Withdrawn",
+      "discriminator": [
+        20,
+        89,
+        223,
+        198,
+        194,
+        124,
+        219,
+        13
+      ]
+    }
+  ],
+  "types": [
+    {
+      "name": "Converted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "converter",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount_in",
+            "type": "u64"
+          },
+          {
+            "name": "amount_out",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Converter",
+      "docs": [
+        "Moves stake from an old pool to the current one:",
+        "`[CONVERTER_SEED, from_pool, to_pool]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "from_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "to_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "docs": [
+              "Holds the new token it pays out."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "rate_num",
+            "docs": [
+              "New tokens per old: `rate_num / rate_den`."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "rate_den",
+            "type": "u64"
+          },
+          {
+            "name": "open",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConverterClosed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "converter",
+            "type": "pubkey"
+          },
+          {
+            "name": "returned",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ConverterOpened",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "converter",
+            "type": "pubkey"
+          },
+          {
+            "name": "from_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "to_pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "rate_num",
+            "type": "u64"
+          },
+          {
+            "name": "rate_den",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Council",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "signers",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "required",
+            "docs": [
+              "How many signers must confirm."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "tenure",
+            "docs": [
+              "Seconds after `seated_at` before the DAO can replace the signers",
+              "without their confirmation."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "seated_at",
+            "type": "i64"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Goes up with every change, so approvals given to an earlier council",
+              "don't count."
+            ],
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Dao",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "create_key",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "governance_program",
+            "docs": [
+              "The governance program running the DAO now."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "governance",
+            "docs": [
+              "The DAO's account in that program: `[GOVERNANCE_SEED, dao, epoch]` there."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "Starts at 1 and goes up with every switch. Proposals only run in",
+              "the epoch they were made in."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "pending_switch",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "PendingSwitch"
+                }
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "treasury_bump",
+            "type": "u8"
+          },
+          {
+            "name": "executor_bump",
+            "type": "u8"
+          },
+          {
+            "name": "council",
+            "docs": [
+              "The security council, when on."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Council"
+                }
+              }
+            }
+          },
+          {
+            "name": "allowance_count",
+            "docs": [
+              "How many allowances this DAO has granted (the latest id)."
+            ],
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DaoToken",
+      "docs": [
+        "The DAO's token: `[TOKEN_SEED, dao]`. Members stake in `pool`, the",
+        "only pool that takes new stake, and token-based governance reads voting",
+        "power from it."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "docs": [
+              "vortex-stake's pool for `mint`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockRecord",
+      "docs": [
+        "What one governance holds of one stake: `[LOCK_SEED, stake, governance]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake",
+            "type": "pubkey"
+          },
+          {
+            "name": "locker",
+            "docs": [
+              "The governance account that locked it, the only one that can unlock it."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Locked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake",
+            "type": "pubkey"
+          },
+          {
+            "name": "locker",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "locked",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LockedUntil",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake",
+            "type": "pubkey"
+          },
+          {
+            "name": "governance",
+            "type": "pubkey"
+          },
+          {
+            "name": "until",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PendingSwitch",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "program",
+            "type": "pubkey"
+          },
+          {
+            "name": "ready_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Pool",
+      "docs": [
+        "A DAO's pool for one token: `[POOL_SEED, dao, mint]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "total",
+            "docs": [
+              "Everything staked here (raw tokens)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PoolCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Stake",
+      "docs": [
+        "One member's stake in a pool: `[STAKE_SEED, pool, owner]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Staked (raw tokens)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "locked",
+            "docs": [
+              "Held by `Lock`s, one per governance that locked some."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "locked_until",
+            "docs": [
+              "The whole stake stays until this time (the end of the latest vote",
+              "it was cast in)."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Staked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Unlocked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "stake",
+            "type": "pubkey"
+          },
+          {
+            "name": "locker",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "locked",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Withdrawn",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

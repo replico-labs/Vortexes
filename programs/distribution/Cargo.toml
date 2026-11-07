@@ -1,0 +1,32 @@
+[package]
+name = "vortex-distribution"
+description = "Vortexes distribution: a DAO's Distributor (every token it has promised, with vesting, claimable from the member's chat account) and its raises (pro-rata fundraises paying only into the DAO's treasury)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "vortex_distribution"
+
+[features]
+default = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+custom-heap = []
+custom-panic = []
+anchor-debug = []
+cpi = ["no-entrypoint"]
+idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
+
+[dependencies]
+anchor-lang = { workspace = true, features = ["init-if-needed"] }
+anchor-spl = { workspace = true }
+vortex-core = { path = "../../crates/vortex-core" }
+vortex-hub = { path = "../hub", features = ["cpi"] }
+vortex-delegate = { path = "../delegate", features = ["cpi"] }
+vortex-vault = { path = "../vault", features = ["cpi"] }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }

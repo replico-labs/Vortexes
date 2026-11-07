@@ -7,7 +7,7 @@ resolution = true
 skip-lint = false
 
 [workspace]
-members = ["programs/hub", "programs/token-weighted", "programs/quadratic", "programs/optimistic", "programs/board", "programs/conviction", "programs/delegate", "programs/liquid", "programs/sortition", "programs/sowellian", "programs/decision-markets", "programs/fill"]
+members = ["programs/hub", "programs/token-weighted", "programs/quadratic", "programs/optimistic", "programs/board", "programs/conviction", "programs/delegate", "programs/liquid", "programs/sortition", "programs/sowellian", "programs/decision-markets", "programs/fill", "programs/stake"]
 
 # The devnet deployment's program IDs (keypairs kept off git by their deployer).
 [programs.localnet]
@@ -22,7 +22,10 @@ vortex_liquid = "CMf1cxiDNmEasmM9VQwJSz5p4RVw1A5GZUjTEy95du1W"
 vortex_sortition = "FjuZX6dakUUY2GxqnHiqkpDUADBJyA3GkmoT5gqvp6U5"
 vortex_sowellian = "G99YpKvNXVQmTgvXX6XGt1z3LvbEyhhDCENwat1nsrx2"
 vortex_decision_markets = "FfUPS88Xoao8N4QTW9SGtua1XyN2q4HyBpNha7AB5t4S"
+vortex_stake = "7T27h8r13Xmp1m4vQbHFfs1xTqdQaHnxW7ybHvwjqKAd"
 vortex_fill = "9QavLTD5JqCtemTJ1GLwxqeaByWJrs6LQtawwjtWfw77"
+vortex_distribution = "4FeTS89hg2BtrkV2vN73be93bVvokBRHR7gbC6uUJgAq"
+vortex_vault = "GjVM1GkPEzXMRLsrP2FLr9UXJpXDVnwGVsVYbzTvtAU5"
 
 [programs.devnet]
 vortex_hub = "5m9N12e9seKNxEXFBJSKr5vd9uryXpckSakfrzDWxMKe"
@@ -36,6 +39,9 @@ vortex_liquid = "CMf1cxiDNmEasmM9VQwJSz5p4RVw1A5GZUjTEy95du1W"
 vortex_sortition = "FjuZX6dakUUY2GxqnHiqkpDUADBJyA3GkmoT5gqvp6U5"
 vortex_sowellian = "G99YpKvNXVQmTgvXX6XGt1z3LvbEyhhDCENwat1nsrx2"
 vortex_decision_markets = "FfUPS88Xoao8N4QTW9SGtua1XyN2q4HyBpNha7AB5t4S"
+vortex_stake = "7T27h8r13Xmp1m4vQbHFfs1xTqdQaHnxW7ybHvwjqKAd"
+vortex_distribution = "4FeTS89hg2BtrkV2vN73be93bVvokBRHR7gbC6uUJgAq"
+vortex_vault = "GjVM1GkPEzXMRLsrP2FLr9UXJpXDVnwGVsVYbzTvtAU5"
 
 [provider]
 cluster = "localnet"

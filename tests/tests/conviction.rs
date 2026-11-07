@@ -94,16 +94,16 @@ fn backing_tokens_stay_locked_until_support_is_withdrawn() {
     let (mut env, alice, _bob) = conviction_dao();
     let (_, p) = env.conv_propose(&alice, vec![env.pay_sol(&alice.kp.pubkey(), 1)], vec![]).unwrap();
     env.support(&alice, p, None).unwrap();
-    assert_eq!(code(env.withdraw(CONV, &alice, 1)), err(GovError::TokensLocked));
+    assert_eq!(code(env.withdraw(CONV, &alice, 1)), err(GovError::InsufficientDeposit), "all 600 locked behind the support");
     // Tokens deposited later aren't backing anything, so they can leave.
     env.deposit(CONV, &alice, 100).unwrap();
     env.withdraw(CONV, &alice, 100).unwrap();
-    assert_eq!(code(env.withdraw(CONV, &alice, 1)), err(GovError::TokensLocked));
+    assert_eq!(code(env.withdraw(CONV, &alice, 1)), err(GovError::InsufficientDeposit));
     // Supporting again tops up with what was deposited since.
     env.deposit(CONV, &alice, 100).unwrap();
     env.support(&alice, p, None).unwrap();
     assert_eq!(env.conv_proposal(p).total_support, 700);
-    assert_eq!(code(env.withdraw(CONV, &alice, 1)), err(GovError::TokensLocked));
+    assert_eq!(code(env.withdraw(CONV, &alice, 1)), err(GovError::InsufficientDeposit));
     env.withdraw_support(&alice, p).unwrap();
     assert_eq!(env.conv_proposal(p).total_support, 0);
     env.withdraw(CONV, &alice, 700).unwrap();
@@ -172,16 +172,17 @@ fn a_token_weighted_dao_can_switch_to_conviction() {
     env.apply_switch(CONV).unwrap();
     assert_eq!((env.hub_dao().governance_program, env.hub_dao().epoch), (CONV, 2));
 
-    env.withdraw(TW, &bob, 400).unwrap();
-    env.deposit(CONV, &bob, 400).unwrap();
+    // The stake carried over: nobody moves tokens for a switch.
+    assert_eq!(env.voter_account(CONV, &bob.kp.pubkey()).amount, 400);
     let host = Keypair::new().pubkey();
     let (_, p) = env.conv_propose(&bob, vec![env.pay_sol(&host, 3_000_000)], vec![Env::sol_budget(3_000_000)]).unwrap();
-    assert_eq!(env.conv_proposal(p).required_conviction, 100, "the 100 floor: 20% of 400 is 80");
+    assert_eq!(env.conv_proposal(p).required_conviction, 200, "20% of the 1,000 staked");
     env.support(&bob, p, None).unwrap();
+    env.support(&alice, p, None).unwrap();
     let t = env.now();
-    env.warp(t + 10);
+    env.warp(t + 20);
     env.queue(CONV, p).unwrap();
-    env.warp(t + 60);
+    env.warp(t + 70);
     env.execute(CONV, p).unwrap();
     assert_eq!(env.lamports(&host), 3_000_000);
 }

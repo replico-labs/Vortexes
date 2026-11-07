@@ -26,6 +26,11 @@
 //!
 //! Each proposal tracks the collateral behind it, and every payout comes
 //! out of that, so one proposal's market can never draw on another's.
+//!
+//! - **The DAO's token can change** (the hub's `set_dao_token`) without
+//!   changing this governance: anyone then calls `sync_base_token`, which
+//!   opens a base vault for the new token. Each proposal keeps the base
+//!   token and vault it was made with, so open markets settle in it.
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::set_return_data;
@@ -49,17 +54,15 @@ pub mod vortex_decision_markets {
     /// Sets up a hub DAO here: rules, the DAO's token (base), the quote
     /// token, and a vault for each. The creator right after create_dao, or
     /// the treasury when switching here.
-    pub fn init_governance(ctx: Context<InitGovernance>, config: MarketsConfig) -> Result<()> {
+    pub fn init_governance(ctx: Context<InitGovernance>, epoch: u32, config: MarketsConfig) -> Result<()> {
         config.validate()?;
         let hub_dao = &ctx.accounts.hub_dao;
         let hub_dao_key = hub_dao.key();
-        let becoming_active = hub_dao.governance_program == crate::ID
-            || hub_dao.pending_switch.as_ref().is_some_and(|s| s.program == crate::ID);
-        require!(becoming_active, GovError::NotActiveGovernance);
         let treasury = vortex_hub::treasury_address(&hub_dao_key);
         let who = ctx.accounts.authority.key();
-        let first_setup = hub_dao.epoch == 1 && hub_dao.governance_program == crate::ID;
-        require!(who == treasury || (first_setup && who == hub_dao.creator), GovError::Unauthorized);
+        // Epoch 1 by the creator for the DAO's first governance; the next
+        // epoch by the treasury (a passed proposal) for a pending switch here.
+        hub_dao.check_setup(&hub_dao_key, &crate::ID, &who, epoch)?;
         require_keys_neq!(ctx.accounts.base_mint.key(), ctx.accounts.quote_mint.key(), GovError::InvalidConfig);
 
         let g = &mut ctx.accounts.governance;
@@ -72,8 +75,23 @@ pub mod vortex_decision_markets {
         g.quote_vault = ctx.accounts.quote_vault.key();
         g.config = config;
         g.proposal_count = 0;
+        g.epoch = epoch;
         g.bump = ctx.bumps.governance;
         emit!(GovernanceInitialized { hub_dao: hub_dao_key, governance: g.key(), base_mint: g.base_mint, quote_mint: g.quote_mint });
+        Ok(())
+    }
+
+    /// After the DAO changed its token (the hub's record), moves new
+    /// proposals onto it: opens the base vault for the new token. Anyone.
+    /// Open proposals keep the token and vault they were made with.
+    pub fn sync_base_token(ctx: Context<SyncBaseToken>) -> Result<()> {
+        let g = &mut ctx.accounts.governance;
+        let mint = ctx.accounts.base_mint.key();
+        require_keys_neq!(mint, g.base_mint, GovError::InvalidConfig);
+        require_keys_neq!(mint, g.quote_mint, GovError::InvalidConfig);
+        g.base_mint = mint;
+        g.base_vault = ctx.accounts.base_vault.key();
+        emit!(BaseTokenSynced { hub_dao: g.hub_dao, governance: g.key(), base_mint: mint });
         Ok(())
     }
 
@@ -100,6 +118,8 @@ pub mod vortex_decision_markets {
         p.id = id;
         p.proposer = ctx.accounts.proposer.key();
         p.metadata_uri = metadata_uri;
+        p.base_mint = g.base_mint;
+        p.base_vault = g.base_vault;
         p.created_at = now;
         p.trading_deadline = now + g.config.trading_period as i64;
         p.pass_pool = Pool { base: base_seed, quote: quote_seed };
@@ -375,7 +395,8 @@ fn pay_out<'info>(
         return Ok(());
     }
     let hub_dao = g.hub_dao;
-    let seeds: &[&[u8]] = &[GOVERNANCE_SEED, hub_dao.as_ref(), &[g.bump]];
+    let epoch_bytes = g.epoch.to_le_bytes();
+    let seeds: &[&[u8]] = &[GOVERNANCE_SEED, hub_dao.as_ref(), &epoch_bytes, &[g.bump]];
     token_interface::transfer_checked(
         CpiContext::new_with_signer(
             token_program.key(),
@@ -437,7 +458,8 @@ pub struct Governance {
     pub hub_dao: Pubkey,
     pub treasury: Pubkey,
     pub executor: Pubkey,
-    /// The DAO's token.
+    /// The DAO's token for new proposals (follows the hub's record through
+    /// `sync_base_token`).
     pub base_mint: Pubkey,
     /// What it's priced in.
     pub quote_mint: Pubkey,
@@ -445,6 +467,8 @@ pub struct Governance {
     pub quote_vault: Pubkey,
     pub config: MarketsConfig,
     pub proposal_count: u64,
+    /// The hub epoch this setup is for (part of its address).
+    pub epoch: u32,
     pub bump: u8,
 }
 
@@ -455,6 +479,10 @@ pub struct Proposal {
     pub id: u64,
     pub proposer: Pubkey,
     pub metadata_uri: String,
+    /// The DAO's token and its base vault when proposed: this proposal's
+    /// markets settle in them, even after a token change.
+    pub base_mint: Pubkey,
+    pub base_vault: Pubkey,
     /// When the markets opened: the start of the TWAP window.
     pub created_at: i64,
     pub trading_deadline: i64,
@@ -483,6 +511,7 @@ impl Proposal {
         8 + (32 + 4 + vortex_core::instructions_len(instructions))
             + 32 + 8 + 32
             + (4 + metadata_uri.len())
+            + 32 + 32
             + 8 + 8
             + Pool::INIT_SPACE * 2
             + 8 + 16 + 16
@@ -510,12 +539,13 @@ pub struct Position {
 // ---------------------------------------------------------------
 
 #[derive(Accounts)]
+#[instruction(epoch: u32)]
 pub struct InitGovernance<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
     pub hub_dao: Box<Account<'info, HubDao>>,
-    #[account(init, payer = payer, space = 8 + Governance::INIT_SPACE, seeds = [GOVERNANCE_SEED, hub_dao.key().as_ref()], bump)]
+    #[account(init, payer = payer, space = 8 + Governance::INIT_SPACE, seeds = [GOVERNANCE_SEED, hub_dao.key().as_ref(), &epoch.to_le_bytes()], bump)]
     pub governance: Box<Account<'info, Governance>>,
     pub base_mint: Box<InterfaceAccount<'info, Mint>>,
     /// The DAO's token on record at the hub (set_dao_token): setting up -
@@ -529,7 +559,7 @@ pub struct InitGovernance<'info> {
     pub dao_token: Box<Account<'info, DaoToken>>,
     pub quote_mint: Box<InterfaceAccount<'info, Mint>>,
     #[account(
-        init, payer = payer, seeds = [BASE_VAULT_SEED, governance.key().as_ref()], bump,
+        init, payer = payer, seeds = [BASE_VAULT_SEED, governance.key().as_ref(), base_mint.key().as_ref()], bump,
         token::mint = base_mint, token::authority = governance, token::token_program = base_token_program,
     )]
     pub base_vault: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -543,13 +573,33 @@ pub struct InitGovernance<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// The DAO's two vaults, mints and token programs, checked against its governance.
+#[derive(Accounts)]
+pub struct SyncBaseToken<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    #[account(mut, has_one = hub_dao @ GovError::WrongDao)]
+    pub governance: Box<Account<'info, Governance>>,
+    pub hub_dao: Box<Account<'info, HubDao>>,
+    #[account(seeds = [vortex_hub::TOKEN_SEED, hub_dao.key().as_ref()], bump = dao_token.bump, seeds::program = vortex_hub::ID)]
+    pub dao_token: Box<Account<'info, DaoToken>>,
+    /// The DAO's token on record now.
+    #[account(address = dao_token.mint @ GovError::WrongMint)]
+    pub base_mint: Box<InterfaceAccount<'info, Mint>>,
+    #[account(
+        init, payer = payer, seeds = [BASE_VAULT_SEED, governance.key().as_ref(), base_mint.key().as_ref()], bump,
+        token::mint = base_mint, token::authority = governance, token::token_program = base_token_program,
+    )]
+    pub base_vault: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub base_token_program: Interface<'info, TokenInterface>,
+    pub system_program: Program<'info, System>,
+}
+
+/// The vaults, mints and token programs: the quote side checked against the
+/// governance, the base side against the proposal (or, when proposing, the
+/// governance's current base token).
 #[derive(Accounts)]
 pub struct Tokens<'info> {
-    #[account(
-        has_one = base_mint @ GovError::WrongDao, has_one = quote_mint @ GovError::WrongDao,
-        has_one = base_vault @ GovError::WrongDao, has_one = quote_vault @ GovError::WrongDao,
-    )]
+    #[account(has_one = quote_mint @ GovError::WrongDao, has_one = quote_vault @ GovError::WrongDao)]
     pub governance: Box<Account<'info, Governance>>,
     #[account(mut)]
     pub base_vault: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -566,9 +616,23 @@ pub struct Tokens<'info> {
 pub struct Propose<'info> {
     #[account(mut)]
     pub proposer: Signer<'info>,
-    #[account(mut, has_one = hub_dao @ GovError::WrongDao, constraint = governance.key() == tokens.governance.key() @ GovError::WrongDao)]
+    #[account(
+        mut,
+        has_one = hub_dao @ GovError::WrongDao,
+        constraint = governance.key() == tokens.governance.key() @ GovError::WrongDao,
+        constraint = governance.base_mint == tokens.base_mint.key() @ GovError::WrongMint,
+        constraint = governance.base_vault == tokens.base_vault.key() @ GovError::WrongDao,
+    )]
     pub governance: Box<Account<'info, Governance>>,
     pub hub_dao: Box<Account<'info, HubDao>>,
+    /// New proposals use the DAO's token on record: sync first after a change.
+    #[account(
+        seeds = [vortex_hub::TOKEN_SEED, hub_dao.key().as_ref()],
+        bump = dao_token.bump,
+        seeds::program = vortex_hub::ID,
+        constraint = dao_token.mint == governance.base_mint @ GovError::WrongMint,
+    )]
+    pub dao_token: Box<Account<'info, DaoToken>>,
     #[account(
         init, payer = proposer, space = Proposal::space(&metadata_uri, &instructions),
         seeds = [PROPOSAL_SEED, governance.key().as_ref(), &id.to_le_bytes()], bump,
@@ -586,7 +650,12 @@ pub struct Propose<'info> {
 pub struct Split<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
-    #[account(mut, constraint = proposal.governance == tokens.governance.key() @ GovError::WrongDao)]
+    #[account(
+        mut,
+        constraint = proposal.governance == tokens.governance.key() @ GovError::WrongDao,
+        constraint = proposal.base_mint == tokens.base_mint.key() @ GovError::WrongMint,
+        constraint = proposal.base_vault == tokens.base_vault.key() @ GovError::WrongDao,
+    )]
     pub proposal: Box<Account<'info, Proposal>>,
     #[account(
         init_if_needed, payer = owner, space = 8 + Position::INIT_SPACE,
@@ -607,7 +676,12 @@ pub struct Redeem<'info> {
     pub owner: Signer<'info>,
     #[account(constraint = governance.key() == tokens.governance.key() @ GovError::WrongDao)]
     pub governance: Box<Account<'info, Governance>>,
-    #[account(mut, has_one = governance @ GovError::WrongDao)]
+    #[account(
+        mut,
+        has_one = governance @ GovError::WrongDao,
+        constraint = proposal.base_mint == tokens.base_mint.key() @ GovError::WrongMint,
+        constraint = proposal.base_vault == tokens.base_vault.key() @ GovError::WrongDao,
+    )]
     pub proposal: Box<Account<'info, Proposal>>,
     #[account(mut, seeds = [POSITION_SEED, proposal.key().as_ref(), owner.key().as_ref()], bump = position.bump)]
     pub position: Box<Account<'info, Position>>,
@@ -639,7 +713,13 @@ pub struct ReclaimLiquidity<'info> {
     pub proposer: Signer<'info>,
     #[account(constraint = governance.key() == tokens.governance.key() @ GovError::WrongDao)]
     pub governance: Box<Account<'info, Governance>>,
-    #[account(mut, has_one = governance @ GovError::WrongDao, has_one = proposer @ GovError::Unauthorized)]
+    #[account(
+        mut,
+        has_one = governance @ GovError::WrongDao,
+        has_one = proposer @ GovError::Unauthorized,
+        constraint = proposal.base_mint == tokens.base_mint.key() @ GovError::WrongMint,
+        constraint = proposal.base_vault == tokens.base_vault.key() @ GovError::WrongDao,
+    )]
     pub proposal: Box<Account<'info, Proposal>>,
     #[account(mut, token::mint = tokens.base_mint, token::token_program = tokens.base_token_program)]
     pub proposer_base: Box<InterfaceAccount<'info, TokenAccount>>,
@@ -684,6 +764,13 @@ pub struct GovernanceInitialized {
     pub governance: Pubkey,
     pub base_mint: Pubkey,
     pub quote_mint: Pubkey,
+}
+
+#[event]
+pub struct BaseTokenSynced {
+    pub hub_dao: Pubkey,
+    pub governance: Pubkey,
+    pub base_mint: Pubkey,
 }
 
 #[event]

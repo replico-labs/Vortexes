@@ -30,7 +30,7 @@ fn governance(env: &Env) -> sort::Governance {
 }
 
 fn pool(env: &Env) -> Vec<Pubkey> {
-    sort::Pool::try_deserialize(&mut env.svm.get_account(&pool_pda(env)).unwrap().data.as_slice()).unwrap().members
+    sort::DrawPool::try_deserialize(&mut env.svm.get_account(&pool_pda(env)).unwrap().data.as_slice()).unwrap().members
 }
 
 /// A sortition DAO (council: the creator) and `n` members with 100 deposited each.
@@ -46,14 +46,11 @@ fn sortition_dao(seats: u8, n: usize) -> (Env, Vec<Member>) {
             hub_dao: env.dao,
             governance: env.governance(SORT),
             pool: pool_pda(env),
-            mint: env.mint,
             dao_token: hub::dao_token_address(&env.dao),
-            vault: env.vault(SORT),
-            token_program: env.token_program,
             system_program: SYSTEM,
         }
         .to_account_metas(None),
-        data: sort::instruction::InitGovernance { council: vec![creator], config }.data(),
+        data: sort::instruction::InitGovernance { epoch: env.governance_epoch(SORT), council: vec![creator], config }.data(),
     });
     // Seats for later draws come from a config update; for these tests the
     // DAO starts with `seats` straight away.
@@ -81,52 +78,58 @@ fn write<T: anchor_lang::AccountSerialize>(env: &mut Env, address: Pubkey, value
 }
 
 fn deposit(env: &mut Env, m: &Member, amount: u64) -> Result<(), FailedTransactionMetadata> {
-    let ix = Instruction {
-        program_id: SORT,
-        accounts: sort::accounts::Deposit {
-            owner: m.kp.pubkey(),
-            governance: env.governance(SORT),
-            voter: env.voter_pda(SORT, &m.kp.pubkey()),
-            owner_token_account: m.ata,
-            vault: env.vault(SORT),
-            mint: env.mint,
-            token_program: env.token_program,
-            system_program: SYSTEM,
-        }
-        .to_account_metas(None),
-        data: sort::instruction::Deposit { amount }.data(),
-    };
-    env.send(&[ix], &[&m.kp])
+    env.deposit(SORT, m, amount)
 }
 
 fn withdraw(env: &mut Env, m: &Member, amount: u64) -> Result<(), FailedTransactionMetadata> {
-    let ix = Instruction {
-        program_id: SORT,
-        accounts: sort::accounts::Withdraw {
-            owner: m.kp.pubkey(),
-            governance: env.governance(SORT),
-            voter: env.voter_pda(SORT, &m.kp.pubkey()),
-            owner_token_account: m.ata,
-            vault: env.vault(SORT),
-            mint: env.mint,
-            token_program: env.token_program,
-        }
-        .to_account_metas(None),
-        data: sort::instruction::Withdraw { amount }.data(),
-    };
-    env.send(&[ix], &[&m.kp])
+    env.withdraw(SORT, m, amount)
 }
 
+/// Joining locks the eligibility threshold of the member's stake (with
+/// their consent: they sign); leaving releases it.
 fn pool_action(env: &mut Env, m: &Member, join: bool) -> Result<(), FailedTransactionMetadata> {
-    let accounts = sort::accounts::PoolAction {
-        owner: m.kp.pubkey(),
-        governance: env.governance(SORT),
-        pool: pool_pda(env),
-        voter: env.voter_pda(SORT, &m.kp.pubkey()),
-    }
-    .to_account_metas(None);
-    let data = if join { sort::instruction::JoinPool {}.data() } else { sort::instruction::LeavePool {}.data() };
-    env.send(&[Instruction { program_id: SORT, accounts, data }], &[&m.kp])
+    let owner = m.kp.pubkey();
+    let governance = env.governance(SORT);
+    let stake_pool = env.pool();
+    let stake = Env::stake_pda(&stake_pool, &owner);
+    let lock = Env::lock_pda(&stake_pool, &owner, &governance);
+    let ix = if join {
+        Instruction {
+            program_id: SORT,
+            accounts: sort::accounts::JoinPool {
+                owner,
+                governance,
+                hub_dao: env.dao,
+                pool: pool_pda(env),
+                voter: env.voter_pda(SORT, &owner),
+                dao_token: hub::dao_token_address(&env.dao),
+                stake_pool,
+                stake,
+                lock,
+                stake_program: STAKE,
+                system_program: SYSTEM,
+            }
+            .to_account_metas(None),
+            data: sort::instruction::JoinPool {}.data(),
+        }
+    } else {
+        let has_lock = env.svm.get_account(&lock).is_some_and(|a| a.lamports > 0);
+        Instruction {
+            program_id: SORT,
+            accounts: sort::accounts::LeavePool {
+                owner,
+                governance,
+                pool: pool_pda(env),
+                voter: env.voter_pda(SORT, &owner),
+                stake,
+                lock: Some(if has_lock { lock } else { SORT }),
+                stake_program: STAKE,
+            }
+            .to_account_metas(None),
+            data: sort::instruction::LeavePool {}.data(),
+        }
+    };
+    env.send(&[ix], &[&m.kp])
 }
 
 fn randomness_address(seed: &[u8; 32]) -> Pubkey {
@@ -235,10 +238,10 @@ fn the_pool_needs_a_deposit_and_locks_it() {
     assert_eq!(code(pool_action(&mut env, &small, true)), err(GovError::ProposalThresholdNotMet));
     pool_action(&mut env, &ms[0], true).unwrap();
     assert_eq!(code(pool_action(&mut env, &ms[0], true)), err(GovError::AlreadyEligible));
-    assert_eq!(code(withdraw(&mut env, &ms[0], 10)), err(GovError::LeavePoolFirst));
+    assert_eq!(code(withdraw(&mut env, &ms[0], 10)), err(GovError::InsufficientDeposit), "the threshold is locked while in the pool");
     pool_action(&mut env, &ms[0], false).unwrap();
     withdraw(&mut env, &ms[0], 100).unwrap();
-    assert_eq!(code(pool_action(&mut env, &ms[1], false)), err(GovError::NotEligible));
+    assert!(pool_action(&mut env, &ms[1], false).is_err(), "never joined");
 }
 
 #[test]

@@ -4,9 +4,11 @@
 //! campaign for one. Once seated, the council governs one seat, one vote,
 //! like vortex-delegate's.
 //!
-//! - Members deposit the DAO's token. With at least `eligibility_threshold`
-//!   deposited they can join the **draw pool**; their deposit stays locked
-//!   while they're in it.
+//! - Members stake the DAO's token in its stake pool (vortex-stake), not
+//!   here. With at least `eligibility_threshold` staked they can join the
+//!   **draw pool**; that much of their stake stays locked there for this
+//!   governance while they're in it (the member and this governance both
+//!   sign; leaving unlocks it, even after a switch).
 //! - **Draws.** Once the council's term is over, anyone starts a draw. The
 //!   randomness comes from ORAO VRF (`VRFzZoJdhFWL8rkvu87LpKM3RbcVezpMEc6X5GVDr7y`,
 //!   the same on devnet and mainnet), requested in the same transaction:
@@ -32,16 +34,15 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::set_return_data;
-use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 use vortex_core::{
     execution_expired, proposal_state, timelock_complete, validate_instructions, validate_uri, GovError, Lifecycle,
-    ProposalCore, ProposalState, StoredInstruction, Tally, VotingConfig, GOVERNANCE_SEED, MAX_BPS,
+    ProposalCore, ProposalState, StoredInstruction, Tally, VotingConfig, GOVERNANCE_SEED, MAX_BPS, STAKE_SEED,
 };
 use vortex_hub::{Dao as HubDao, DaoToken};
+use vortex_stake::{LockRecord, Pool as StakePool, Stake};
 
 declare_id!("FjuZX6dakUUY2GxqnHiqkpDUADBJyA3GkmoT5gqvp6U5");
 
-pub const VAULT_SEED: &[u8] = b"vault";
 pub const VOTER_SEED: &[u8] = b"voter";
 pub const POOL_SEED: &[u8] = b"pool";
 pub const PROPOSAL_SEED: &[u8] = b"proposal";
@@ -65,7 +66,7 @@ pub mod vortex_sortition {
     /// draw pool and the first council (exactly `council_size` members),
     /// whose term starts now. The creator right after
     /// `vortex_hub::create_dao`, or the DAO's treasury when switching here.
-    pub fn init_governance(ctx: Context<InitGovernance>, council: Vec<Pubkey>, config: SortitionConfig) -> Result<()> {
+    pub fn init_governance(ctx: Context<InitGovernance>, epoch: u32, council: Vec<Pubkey>, config: SortitionConfig) -> Result<()> {
         config.validate()?;
         require!(council.len() == config.council_size as usize, GovError::InvalidConfig);
         for (i, m) in council.iter().enumerate() {
@@ -74,113 +75,86 @@ pub mod vortex_sortition {
         }
         let hub_dao = &ctx.accounts.hub_dao;
         let hub_dao_key = hub_dao.key();
-        let becoming_active = hub_dao.governance_program == crate::ID
-            || hub_dao.pending_switch.as_ref().is_some_and(|s| s.program == crate::ID);
-        require!(becoming_active, GovError::NotActiveGovernance);
         let treasury = vortex_hub::treasury_address(&hub_dao_key);
         let who = ctx.accounts.authority.key();
-        let first_setup = hub_dao.epoch == 1 && hub_dao.governance_program == crate::ID;
-        require!(who == treasury || (first_setup && who == hub_dao.creator), GovError::Unauthorized);
+        // Epoch 1 by the creator for the DAO's first governance; the next
+        // epoch by the treasury (a passed proposal) for a pending switch here.
+        hub_dao.check_setup(&hub_dao_key, &crate::ID, &who, epoch)?;
 
         let g = &mut ctx.accounts.governance;
         g.hub_dao = hub_dao_key;
         g.treasury = treasury;
         g.executor = vortex_hub::executor_address(&hub_dao_key);
-        g.mint = ctx.accounts.mint.key();
-        g.vault = ctx.accounts.vault.key();
         g.config = config;
         g.council = council;
         g.council_term = 1;
         g.term_ends_at = Clock::get()?.unix_timestamp + config.term_length as i64;
         g.proposal_count = 0;
-        g.total_deposited = 0;
         g.draw_count = 0;
         g.draw_open = false;
         g.draw_seed = [0; 32];
         g.draw_started_at = 0;
+        g.epoch = epoch;
         g.bump = ctx.bumps.governance;
         ctx.accounts.pool.governance = g.key();
         ctx.accounts.pool.bump = ctx.bumps.pool;
-        emit!(GovernanceInitialized { hub_dao: hub_dao_key, governance: g.key(), mint: g.mint, council: g.council.clone(), term_ends_at: g.term_ends_at });
+        emit!(GovernanceInitialized { hub_dao: hub_dao_key, governance: g.key(), mint: ctx.accounts.dao_token.mint, council: g.council.clone(), term_ends_at: g.term_ends_at });
         Ok(())
     }
 
-    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-        require!(amount > 0, GovError::InvalidAmount);
-        token_interface::transfer_checked(
-            CpiContext::new(
-                ctx.accounts.token_program.key(),
-                TransferChecked {
-                    from: ctx.accounts.owner_token_account.to_account_info(),
-                    mint: ctx.accounts.mint.to_account_info(),
-                    to: ctx.accounts.vault.to_account_info(),
-                    authority: ctx.accounts.owner.to_account_info(),
-                },
-            ),
-            amount,
-            ctx.accounts.mint.decimals,
-        )?;
-        let voter = &mut ctx.accounts.voter;
-        if voter.owner == Pubkey::default() {
-            voter.governance = ctx.accounts.governance.key();
-            voter.owner = ctx.accounts.owner.key();
-            voter.bump = ctx.bumps.voter;
-        }
-        voter.amount = voter.amount.checked_add(amount).ok_or(GovError::Overflow)?;
-        let g = &mut ctx.accounts.governance;
-        g.total_deposited = g.total_deposited.checked_add(amount).ok_or(GovError::Overflow)?;
-        emit!(Deposited { governance: g.key(), owner: voter.owner, amount, total: voter.amount });
-        Ok(())
-    }
-
-    /// Withdraws a deposit; members in the draw pool leave it first.
-    pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
-        require!(amount > 0, GovError::InvalidAmount);
-        let voter = &mut ctx.accounts.voter;
-        require!(!voter.eligible, GovError::LeavePoolFirst);
-        require!(amount <= voter.amount, GovError::InsufficientDeposit);
-        voter.amount -= amount;
-        let g = &mut ctx.accounts.governance;
-        g.total_deposited -= amount;
-        let hub_dao = g.hub_dao;
-        let seeds: &[&[u8]] = &[GOVERNANCE_SEED, hub_dao.as_ref(), &[g.bump]];
-        token_interface::transfer_checked(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.key(),
-                TransferChecked {
-                    from: ctx.accounts.vault.to_account_info(),
-                    mint: ctx.accounts.mint.to_account_info(),
-                    to: ctx.accounts.owner_token_account.to_account_info(),
-                    authority: g.to_account_info(),
-                },
-                &[seeds],
-            ),
-            amount,
-            ctx.accounts.mint.decimals,
-        )?;
-        emit!(Withdrawn { governance: g.key(), owner: voter.owner, amount, total: voter.amount });
-        Ok(())
-    }
-
-    /// Joins the draw pool. Needs `eligibility_threshold` deposited; not
-    /// while a draw is under way.
-    pub fn join_pool(ctx: Context<PoolAction>) -> Result<()> {
+    /// Joins the draw pool. Needs `eligibility_threshold` unlocked in the
+    /// DAO's current stake pool, which is locked there for this governance
+    /// while the member stays in; not while a draw is under way.
+    pub fn join_pool(ctx: Context<JoinPool>) -> Result<()> {
         let g = &ctx.accounts.governance;
         require!(!g.draw_open, GovError::DrawInProgress);
+        let owner = ctx.accounts.owner.key();
+        let threshold = g.config.eligibility_threshold;
         let voter = &mut ctx.accounts.voter;
+        if voter.owner == Pubkey::default() {
+            voter.governance = g.key();
+            voter.owner = owner;
+            voter.bump = ctx.bumps.voter;
+        }
         require!(!voter.eligible, GovError::AlreadyEligible);
-        require!(voter.amount >= g.config.eligibility_threshold, GovError::ProposalThresholdNotMet);
+        let s = &ctx.accounts.stake;
+        require!(s.amount > 0 && s.amount - s.locked >= threshold, GovError::ProposalThresholdNotMet);
         let pool = &mut ctx.accounts.pool;
         require!(pool.members.len() < MAX_POOL, GovError::PoolFull);
-        pool.members.push(voter.owner);
+        pool.members.push(owner);
         voter.eligible = true;
-        emit!(PoolJoined { governance: g.key(), member: voter.owner, pool_size: pool.members.len() as u16 });
+        voter.stake_pool = ctx.accounts.stake_pool.key();
+        voter.locked = threshold;
+        let size = pool.members.len() as u16;
+        if threshold > 0 {
+            let hub = g.hub_dao;
+            let epoch_bytes = g.epoch.to_le_bytes();
+            let seeds: &[&[u8]] = &[GOVERNANCE_SEED, hub.as_ref(), &epoch_bytes, &[g.bump]];
+            vortex_stake::cpi::lock(
+                CpiContext::new_with_signer(
+                    ctx.accounts.stake_program.key(),
+                    vortex_stake::cpi::accounts::Lock {
+                        owner: ctx.accounts.owner.to_account_info(),
+                        governance: g.to_account_info(),
+                        hub_dao: ctx.accounts.hub_dao.to_account_info(),
+                        pool: ctx.accounts.stake_pool.to_account_info(),
+                        stake: ctx.accounts.stake.to_account_info(),
+                        lock: ctx.accounts.lock.to_account_info(),
+                        system_program: ctx.accounts.system_program.to_account_info(),
+                    },
+                    &[seeds],
+                ),
+                threshold,
+            )?;
+        }
+        emit!(PoolJoined { governance: g.key(), member: owner, pool_size: size });
         Ok(())
     }
 
-    /// Leaves the draw pool (a council seat already held is kept). Not
-    /// while a draw is under way.
-    pub fn leave_pool(ctx: Context<PoolAction>) -> Result<()> {
+    /// Leaves the draw pool (a council seat already held is kept) and
+    /// unlocks the stake it held. Not while a draw is under way. Works after
+    /// the DAO has switched away from this governance.
+    pub fn leave_pool(ctx: Context<LeavePool>) -> Result<()> {
         let g = &ctx.accounts.governance;
         require!(!g.draw_open, GovError::DrawInProgress);
         let voter = &mut ctx.accounts.voter;
@@ -189,6 +163,26 @@ pub mod vortex_sortition {
         let i = pool.members.iter().position(|m| *m == voter.owner).ok_or(GovError::NotEligible)?;
         pool.members.swap_remove(i);
         voter.eligible = false;
+        let amount = voter.locked;
+        voter.locked = 0;
+        if amount > 0 {
+            let lock = ctx.accounts.lock.as_ref().ok_or(GovError::InsufficientDeposit)?;
+            let hub = g.hub_dao;
+            let epoch_bytes = g.epoch.to_le_bytes();
+            let seeds: &[&[u8]] = &[GOVERNANCE_SEED, hub.as_ref(), &epoch_bytes, &[g.bump]];
+            vortex_stake::cpi::unlock(
+                CpiContext::new_with_signer(
+                    ctx.accounts.stake_program.key(),
+                    vortex_stake::cpi::accounts::Unlock {
+                        governance: g.to_account_info(),
+                        stake: ctx.accounts.stake.to_account_info(),
+                        lock: lock.to_account_info(),
+                    },
+                    &[seeds],
+                ),
+                amount,
+            )?;
+        }
         emit!(PoolLeft { governance: g.key(), member: voter.owner, pool_size: pool.members.len() as u16 });
         Ok(())
     }
@@ -443,8 +437,6 @@ pub struct Governance {
     pub hub_dao: Pubkey,
     pub treasury: Pubkey,
     pub executor: Pubkey,
-    pub mint: Pubkey,
-    pub vault: Pubkey,
     pub config: SortitionConfig,
     #[max_len(MAX_COUNCIL)]
     pub council: Vec<Pubkey>,
@@ -452,13 +444,14 @@ pub struct Governance {
     pub council_term: u32,
     pub term_ends_at: i64,
     pub proposal_count: u64,
-    pub total_deposited: u64,
     /// Draws started so far (the current one's number while one is open).
     pub draw_count: u64,
     pub draw_open: bool,
     /// The ORAO seed of the draw under way.
     pub draw_seed: [u8; 32],
     pub draw_started_at: i64,
+    /// The hub epoch this setup is for (part of its address).
+    pub epoch: u32,
     pub bump: u8,
 }
 
@@ -500,7 +493,7 @@ impl Governance {
 /// Everyone who can be drawn.
 #[account]
 #[derive(InitSpace)]
-pub struct Pool {
+pub struct DrawPool {
     pub governance: Pubkey,
     #[max_len(MAX_POOL)]
     pub members: Vec<Pubkey>,
@@ -512,9 +505,11 @@ pub struct Pool {
 pub struct Voter {
     pub governance: Pubkey,
     pub owner: Pubkey,
-    pub amount: u64,
-    /// In the draw pool (deposit locked meanwhile).
+    /// In the draw pool (`locked` of their stake held meanwhile).
     pub eligible: bool,
+    /// The stake pool that stake is in.
+    pub stake_pool: Pubkey,
+    pub locked: u64,
     pub bump: u8,
 }
 
@@ -584,77 +579,62 @@ pub enum VoteChoice {
 // ---------------------------------------------------------------
 
 #[derive(Accounts)]
+#[instruction(epoch: u32)]
 pub struct InitGovernance<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
     pub hub_dao: Account<'info, HubDao>,
-    #[account(init, payer = payer, space = 8 + Governance::INIT_SPACE, seeds = [GOVERNANCE_SEED, hub_dao.key().as_ref()], bump)]
+    #[account(init, payer = payer, space = 8 + Governance::INIT_SPACE, seeds = [GOVERNANCE_SEED, hub_dao.key().as_ref(), &epoch.to_le_bytes()], bump)]
     pub governance: Account<'info, Governance>,
-    #[account(init, payer = payer, space = 8 + Pool::INIT_SPACE, seeds = [POOL_SEED, governance.key().as_ref()], bump)]
-    pub pool: Account<'info, Pool>,
-    pub mint: InterfaceAccount<'info, Mint>,
-    /// The DAO's token on record at the hub (set_dao_token): setting up -
-    /// a switch included - only works with that mint.
-    #[account(
-        seeds = [vortex_hub::TOKEN_SEED, hub_dao.key().as_ref()],
-        bump = dao_token.bump,
-        seeds::program = vortex_hub::ID,
-        constraint = dao_token.mint == mint.key() @ GovError::WrongMint,
-    )]
+    #[account(init, payer = payer, space = 8 + DrawPool::INIT_SPACE, seeds = [POOL_SEED, governance.key().as_ref()], bump)]
+    pub pool: Account<'info, DrawPool>,
+    /// The DAO's token on record at the hub (set_dao_token): a token model
+    /// needs one, as members stake it in the hub's pool.
+    #[account(seeds = [vortex_hub::TOKEN_SEED, hub_dao.key().as_ref()], bump = dao_token.bump, seeds::program = vortex_hub::ID)]
     pub dao_token: Account<'info, DaoToken>,
-    #[account(
-        init, payer = payer, seeds = [VAULT_SEED, governance.key().as_ref()], bump,
-        token::mint = mint, token::authority = governance, token::token_program = token_program,
-    )]
-    pub vault: InterfaceAccount<'info, TokenAccount>,
-    pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-pub struct Deposit<'info> {
+pub struct JoinPool<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
-    #[account(mut, has_one = mint @ GovError::WrongDao, has_one = vault @ GovError::WrongDao)]
+    #[account(has_one = hub_dao @ GovError::WrongDao)]
     pub governance: Account<'info, Governance>,
-    #[account(
-        init_if_needed, payer = owner, space = 8 + Voter::INIT_SPACE,
-        seeds = [VOTER_SEED, governance.key().as_ref(), owner.key().as_ref()], bump,
-    )]
+    pub hub_dao: Account<'info, HubDao>,
+    #[account(mut, seeds = [POOL_SEED, governance.key().as_ref()], bump = pool.bump)]
+    pub pool: Account<'info, DrawPool>,
+    #[account(init_if_needed, payer = owner, space = 8 + Voter::INIT_SPACE, seeds = [VOTER_SEED, governance.key().as_ref(), owner.key().as_ref()], bump)]
     pub voter: Account<'info, Voter>,
-    #[account(mut, token::mint = mint, token::authority = owner, token::token_program = token_program)]
-    pub owner_token_account: InterfaceAccount<'info, TokenAccount>,
+    #[account(seeds = [vortex_hub::TOKEN_SEED, hub_dao.key().as_ref()], bump = dao_token.bump, seeds::program = vortex_hub::ID)]
+    pub dao_token: Account<'info, DaoToken>,
+    /// The DAO's current stake pool.
+    #[account(address = dao_token.pool @ GovError::PoolNotCurrent)]
+    pub stake_pool: Account<'info, StakePool>,
+    #[account(mut, seeds = [STAKE_SEED, stake_pool.key().as_ref(), owner.key().as_ref()], bump = stake.bump, seeds::program = vortex_stake::ID)]
+    pub stake: Account<'info, Stake>,
+    /// CHECK: vortex-stake's lock record for this stake and governance, made or checked there.
     #[account(mut)]
-    pub vault: InterfaceAccount<'info, TokenAccount>,
-    pub mint: InterfaceAccount<'info, Mint>,
-    pub token_program: Interface<'info, TokenInterface>,
+    pub lock: UncheckedAccount<'info>,
+    pub stake_program: Program<'info, vortex_stake::program::VortexStake>,
     pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
-pub struct Withdraw<'info> {
-    pub owner: Signer<'info>,
-    #[account(mut, has_one = mint @ GovError::WrongDao, has_one = vault @ GovError::WrongDao)]
-    pub governance: Account<'info, Governance>,
-    #[account(mut, seeds = [VOTER_SEED, governance.key().as_ref(), owner.key().as_ref()], bump = voter.bump)]
-    pub voter: Account<'info, Voter>,
-    #[account(mut, token::mint = mint, token::token_program = token_program)]
-    pub owner_token_account: InterfaceAccount<'info, TokenAccount>,
-    #[account(mut)]
-    pub vault: InterfaceAccount<'info, TokenAccount>,
-    pub mint: InterfaceAccount<'info, Mint>,
-    pub token_program: Interface<'info, TokenInterface>,
-}
-
-#[derive(Accounts)]
-pub struct PoolAction<'info> {
+pub struct LeavePool<'info> {
     pub owner: Signer<'info>,
     pub governance: Account<'info, Governance>,
     #[account(mut, seeds = [POOL_SEED, governance.key().as_ref()], bump = pool.bump)]
-    pub pool: Account<'info, Pool>,
+    pub pool: Account<'info, DrawPool>,
     #[account(mut, seeds = [VOTER_SEED, governance.key().as_ref(), owner.key().as_ref()], bump = voter.bump)]
     pub voter: Account<'info, Voter>,
+    #[account(mut, seeds = [STAKE_SEED, voter.stake_pool.as_ref(), owner.key().as_ref()], bump = stake.bump, seeds::program = vortex_stake::ID)]
+    pub stake: Account<'info, Stake>,
+    /// The lock this governance holds on that stake (none when the threshold was 0).
+    #[account(mut)]
+    pub lock: Option<Account<'info, LockRecord>>,
+    pub stake_program: Program<'info, vortex_stake::program::VortexStake>,
 }
 
 #[derive(Accounts)]
@@ -662,7 +642,7 @@ pub struct StartDraw<'info> {
     #[account(mut)]
     pub governance: Account<'info, Governance>,
     #[account(seeds = [POOL_SEED, governance.key().as_ref()], bump = pool.bump)]
-    pub pool: Account<'info, Pool>,
+    pub pool: Account<'info, DrawPool>,
     /// ORAO's request account for the new seed.
     /// CHECK: address, owner and contents checked by read_randomness.
     pub randomness: UncheckedAccount<'info>,
@@ -677,7 +657,7 @@ pub struct FinalizeDraw<'info> {
     #[account(mut)]
     pub governance: Account<'info, Governance>,
     #[account(mut, seeds = [POOL_SEED, governance.key().as_ref()], bump = pool.bump)]
-    pub pool: Account<'info, Pool>,
+    pub pool: Account<'info, DrawPool>,
     /// CHECK: address, owner and contents checked by read_randomness.
     pub randomness: UncheckedAccount<'info>,
 }
@@ -750,22 +730,6 @@ pub struct GovernanceInitialized {
     pub mint: Pubkey,
     pub council: Vec<Pubkey>,
     pub term_ends_at: i64,
-}
-
-#[event]
-pub struct Deposited {
-    pub governance: Pubkey,
-    pub owner: Pubkey,
-    pub amount: u64,
-    pub total: u64,
-}
-
-#[event]
-pub struct Withdrawn {
-    pub governance: Pubkey,
-    pub owner: Pubkey,
-    pub amount: u64,
-    pub total: u64,
 }
 
 #[event]

@@ -61,10 +61,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -94,10 +91,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -128,10 +122,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -177,37 +168,17 @@
         },
         {
           "name": "governance",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  103,
-                  111,
-                  118,
-                  101,
-                  114,
-                  110,
-                  97,
-                  110,
-                  99,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "hub_dao"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
+        {
+          "name": "epoch",
+          "type": "u32"
+        },
         {
           "name": "signers",
           "type": {
@@ -251,43 +222,14 @@
           "writable": true
         },
         {
-          "name": "hub_dao",
-          "relations": [
-            "governance"
-          ]
+          "name": "hub_dao"
         },
         {
           "name": "proposal",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  114,
-                  111,
-                  112,
-                  111,
-                  115,
-                  97,
-                  108
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "governance"
-              },
-              {
-                "kind": "arg",
-                "path": "id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -366,10 +308,7 @@
           "signer": true
         },
         {
-          "name": "governance",
-          "relations": [
-            "proposal"
-          ]
+          "name": "governance"
         },
         {
           "name": "proposal",
@@ -650,6 +589,47 @@
       }
     },
     {
+      "name": "Council",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "signers",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "required",
+            "docs": [
+              "How many signers must confirm."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "tenure",
+            "docs": [
+              "Seconds after `seated_at` before the DAO can replace the signers",
+              "without their confirmation."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "seated_at",
+            "type": "i64"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Goes up with every change, so approvals given to an earlier council",
+              "don't count."
+            ],
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
       "name": "Dao",
       "type": {
         "kind": "struct",
@@ -676,7 +656,7 @@
           {
             "name": "governance",
             "docs": [
-              "The DAO's account in that program: `[GOVERNANCE_SEED, dao]` there."
+              "The DAO's account in that program: `[GOVERNANCE_SEED, dao, epoch]` there."
             ],
             "type": "pubkey"
           },
@@ -709,6 +689,26 @@
           {
             "name": "executor_bump",
             "type": "u8"
+          },
+          {
+            "name": "council",
+            "docs": [
+              "The security council, when on."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Council"
+                }
+              }
+            }
+          },
+          {
+            "name": "allowance_count",
+            "docs": [
+              "How many allowances this DAO has granted (the latest id)."
+            ],
+            "type": "u64"
           }
         ]
       }
@@ -747,6 +747,13 @@
           {
             "name": "proposal_count",
             "type": "u64"
+          },
+          {
+            "name": "epoch",
+            "docs": [
+              "The hub epoch this setup is for (part of its address)."
+            ],
+            "type": "u32"
           },
           {
             "name": "bump",

@@ -37,47 +37,62 @@ impl Smoke {
                 payer: *me,
                 hub_dao: d.dao,
                 governance: d.governance(LIQ),
-                mint: d.mint,
                 dao_token: hub::dao_token_address(&d.dao),
-                vault: d.vault(LIQ),
-                token_program: spl_token_interface::ID,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
-            data: liq::instruction::InitGovernance { config }.data(),
+            data: liq::instruction::InitGovernance { epoch: d.epoch, config }.data(),
         })?;
-        for (m, amount) in [(alice, 600), (bob, 400)] {
-            let ix = Instruction {
-                program_id: LIQ,
-                accounts: liq::accounts::Deposit {
-                    owner: m.kp.pubkey(),
-                    governance: dao.governance(LIQ),
-                    voter: dao.voter(LIQ, &m.kp.pubkey()),
-                    delegate_voter: None,
-                    owner_token_account: m.ata,
-                    vault: dao.vault(LIQ),
-                    mint: dao.mint,
-                    token_program: spl_token_interface::ID,
-                    system_program: SYSTEM,
-                }
-                .to_account_metas(None),
-                data: liq::instruction::Deposit { amount }.data(),
-            };
-            self.send_ix(ix, &[&m.kp], "deposit")?;
-        }
+        // Both stake in the DAO's pool; delegating locks Bob's stake to Alice.
+        self.deposit(&dao, LIQ, alice, 600)?;
+        self.deposit(&dao, LIQ, bob, 400)?;
         let (a, b) = (alice.kp.pubkey(), bob.kp.pubkey());
         self.send_ix(
             Instruction {
                 program_id: LIQ,
-                accounts: liq::accounts::Delegate { owner: b, governance: dao.governance(LIQ), voter: dao.voter(LIQ, &b), delegate_voter: dao.voter(LIQ, &a), system_program: SYSTEM }
-                    .to_account_metas(None),
+                accounts: liq::accounts::Delegate {
+                    owner: b,
+                    governance: dao.governance(LIQ),
+                    hub_dao: dao.dao,
+                    dao_token: hub::dao_token_address(&dao.dao),
+                    pool: dao.pool(),
+                    stake: dao.stake(&b),
+                    lock: dao.lock(LIQ, &b),
+                    voter: dao.voter(LIQ, &b),
+                    delegate_voter: dao.voter(LIQ, &a),
+                    stake_program: STAKE,
+                    system_program: SYSTEM,
+                }
+                .to_account_metas(None),
                 data: liq::instruction::Delegate { to: a }.data(),
             },
             &[&bob.kp],
             "Bob delegates to Alice",
         )?;
         let to = Keypair::new().pubkey();
-        let p = self.propose_voting(&dao, LIQ, alice, vec![dao.pay(&to)])?;
+        // Liquid's propose also takes the proposer's voter record (Alice's
+        // holds Bob's delegation), so it has its own account list.
+        let p = dao.proposal(LIQ, 1);
+        self.send_ix(
+            Instruction {
+                program_id: LIQ,
+                accounts: liq::accounts::Propose {
+                    proposer: a,
+                    governance: dao.governance(LIQ),
+                    hub_dao: dao.dao,
+                    dao_token: hub::dao_token_address(&dao.dao),
+                    pool: dao.pool(),
+                    proposer_stake: Some(dao.stake(&a)),
+                    voter: Some(dao.voter(LIQ, &a)),
+                    proposal: p,
+                    system_program: SYSTEM,
+                }
+                .to_account_metas(None),
+                data: liq::instruction::Propose { id: 1, metadata_uri: "Smoke test payment".into(), instructions: vec![dao.pay(&to)] }.data(),
+            },
+            &[&alice.kp],
+            "propose",
+        )?;
         let prop = read::<liq::Proposal>(&self.rpc, &p);
         self.wait_until(prop.voting_starts_at);
         let vote = |owner: &Pubkey| Pubkey::find_program_address(&[liq::VOTE_SEED, p.as_ref(), owner.as_ref()], &LIQ).0;
@@ -88,7 +103,11 @@ impl Smoke {
                 accounts: liq::accounts::CastVote {
                     owner: a,
                     governance: dao.governance(LIQ),
+                    hub_dao: dao.dao,
                     proposal: p,
+                    pool: dao.pool(),
+                    stake: dao.stake(&a),
+                    stake_program: STAKE,
                     voter: dao.voter(LIQ, &a),
                     overrides: overrides(&a),
                     vote_record: vote(&a),
@@ -106,7 +125,11 @@ impl Smoke {
                 accounts: liq::accounts::OverrideVote {
                     owner: b,
                     governance: dao.governance(LIQ),
+                    hub_dao: dao.dao,
                     proposal: p,
+                    pool: dao.pool(),
+                    stake: dao.stake(&b),
+                    stake_program: STAKE,
                     voter: dao.voter(LIQ, &b),
                     delegate_voter: dao.voter(LIQ, &a),
                     delegate_record: vote(&a),
@@ -162,14 +185,11 @@ impl Smoke {
                 hub_dao: d.dao,
                 governance: d.governance(SORT),
                 pool: pool_of(d),
-                mint: d.mint,
                 dao_token: hub::dao_token_address(&d.dao),
-                vault: d.vault(SORT),
-                token_program: spl_token_interface::ID,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
-            data: sort::instruction::InitGovernance { council, config }.data(),
+            data: sort::instruction::InitGovernance { epoch: d.epoch, council, config }.data(),
         })?;
         let pool = pool_of(&dao);
         let carol = self.member(mint);
@@ -179,7 +199,21 @@ impl Smoke {
             self.send_ix(
                 Instruction {
                     program_id: SORT,
-                    accounts: sort::accounts::PoolAction { owner: m.kp.pubkey(), governance: dao.governance(SORT), pool, voter: dao.voter(SORT, &m.kp.pubkey()) }.to_account_metas(None),
+                    // Joining locks the eligibility threshold of their stake.
+                    accounts: sort::accounts::JoinPool {
+                        owner: m.kp.pubkey(),
+                        governance: dao.governance(SORT),
+                        hub_dao: dao.dao,
+                        pool,
+                        voter: dao.voter(SORT, &m.kp.pubkey()),
+                        dao_token: hub::dao_token_address(&dao.dao),
+                        stake_pool: dao.pool(),
+                        stake: dao.stake(&m.kp.pubkey()),
+                        lock: dao.lock(SORT, &m.kp.pubkey()),
+                        stake_program: STAKE,
+                        system_program: SYSTEM,
+                    }
+                    .to_account_metas(None),
                     data: sort::instruction::JoinPool {}.data(),
                 },
                 &[&m.kp],
@@ -356,7 +390,7 @@ impl Smoke {
             adjudication_threshold_bps: 5_000,
             max_oracle_staleness: PYTH_WAIT as u32,
         };
-        let escrow_of = |d: &Dao| Pubkey::find_program_address(&[sow::ESCROW_SEED, d.governance(SOW).as_ref()], &SOW).0;
+        let escrow_of = |d: &Dao| Pubkey::find_program_address(&[sow::ESCROW_SEED, d.governance(SOW).as_ref(), d.mint.as_ref()], &SOW).0;
         let dao = self.create_dao(mint, SOW, "Smoke sowellian", |d, me| Instruction {
             program_id: SOW,
             accounts: sow::accounts::InitGovernance {
@@ -364,15 +398,11 @@ impl Smoke {
                 payer: *me,
                 hub_dao: d.dao,
                 governance: d.governance(SOW),
-                mint: d.mint,
                 dao_token: hub::dao_token_address(&d.dao),
-                vault: d.vault(SOW),
-                escrow: escrow_of(d),
-                token_program: spl_token_interface::ID,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
-            data: sow::instruction::InitGovernance { config }.data(),
+            data: sow::instruction::InitGovernance { epoch: d.epoch, config }.data(),
         })?;
         let (g, escrow) = (dao.governance(SOW), escrow_of(&dao));
         self.deposit(&dao, SOW, alice, 600)?;
@@ -395,6 +425,8 @@ impl Smoke {
                     proposer: alice.kp.pubkey(),
                     governance: g,
                     hub_dao: dao.dao,
+                    dao_token: hub::dao_token_address(&dao.dao),
+                    pool: dao.pool(),
                     proposal: p,
                     proposer_token_account: alice.ata,
                     escrow,
@@ -419,8 +451,11 @@ impl Smoke {
                     accounts: sow::accounts::CastApprovalVote {
                         owner: m.kp.pubkey(),
                         governance: g,
+                        hub_dao: dao.dao,
                         proposal: p,
-                        voter: dao.voter(SOW, &m.kp.pubkey()),
+                        pool: dao.pool(),
+                        stake: dao.stake(&m.kp.pubkey()),
+                        stake_program: STAKE,
                         vote_record: Pubkey::find_program_address(&[sow::APPROVAL_VOTE_SEED, p.as_ref(), m.kp.pubkey().as_ref()], &SOW).0,
                         system_program: SYSTEM,
                     }
@@ -472,7 +507,7 @@ impl Smoke {
         self.wait_until(deadline);
 
         // #1: Alice proposes Success; nobody challenges.
-        let bond = |m: &Member, p: Pubkey| sow::accounts::BondAction { owner: m.kp.pubkey(), governance: g, proposal: p, owner_token_account: m.ata, escrow, mint, token_program: spl_token_interface::ID };
+        let bond = |m: &Member, p: Pubkey| sow::accounts::BondAction { owner: m.kp.pubkey(), governance: g, proposal: p, pool: dao.pool(), owner_token_account: m.ata, escrow, mint, token_program: spl_token_interface::ID };
         self.send_ix(
             Instruction { program_id: SOW, accounts: bond(alice, p1).to_account_metas(None), data: sow::instruction::ProposeResolution { outcome: sow::Outcome::Success }.data() },
             &[&alice.kp],
@@ -591,6 +626,8 @@ impl Smoke {
             self.send(&ixs, &[]).map_err(|e| format!("quote tokens: {e}"))?;
         }
         let vault = |d: &Dao, seed: &[u8]| Pubkey::find_program_address(&[seed, d.governance(DM).as_ref()], &DM).0;
+        // One base vault per token the DAO has used.
+        let base_vault = |d: &Dao| Pubkey::find_program_address(&[dm::BASE_VAULT_SEED, d.governance(DM).as_ref(), d.mint.as_ref()], &DM).0;
         let dao = self.create_dao(mint, DM, "Smoke markets", |d, me| Instruction {
             program_id: DM,
             accounts: dm::accounts::InitGovernance {
@@ -601,19 +638,19 @@ impl Smoke {
                 base_mint: d.mint,
                 dao_token: hub::dao_token_address(&d.dao),
                 quote_mint: quote,
-                base_vault: vault(d, dm::BASE_VAULT_SEED),
+                base_vault: base_vault(d),
                 quote_vault: vault(d, dm::QUOTE_VAULT_SEED),
                 base_token_program: spl_token_interface::ID,
                 quote_token_program: spl_token_interface::ID,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
-            data: dm::instruction::InitGovernance { config }.data(),
+            data: dm::instruction::InitGovernance { epoch: d.epoch, config }.data(),
         })?;
         let g = dao.governance(DM);
         let tokens = || dm::accounts::Tokens {
             governance: g,
-            base_vault: vault(&dao, dm::BASE_VAULT_SEED),
+            base_vault: base_vault(&dao),
             quote_vault: vault(&dao, dm::QUOTE_VAULT_SEED),
             base_mint: mint,
             quote_mint: quote,
@@ -629,6 +666,7 @@ impl Smoke {
                     proposer: alice.kp.pubkey(),
                     governance: g,
                     hub_dao: dao.dao,
+                    dao_token: hub::dao_token_address(&dao.dao),
                     proposal: p,
                     proposer_base: alice.ata,
                     proposer_quote: quote_ata(alice),

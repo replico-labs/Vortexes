@@ -2,27 +2,32 @@
 //! `LiquidGovernance.sol`: token-weighted voting where members can hand
 //! their votes to a delegate, and still vote themselves on any proposal.
 //!
-//! - Members deposit the DAO's token into its vault; one token, one vote.
-//!   Proposing, quorum, approval, timelock and execution work as in
-//!   token-weighted.
-//! - **Delegating** points a member's deposit at a delegate. The delegate's
-//!   account keeps a running total of everything delegated to it, so a
-//!   delegate's vote counts their own deposit plus that total straight away.
-//!   Nobody has to come back afterwards to add delegators' votes one by one
-//!   (the EVM version needs a keeper for that).
+//! - Members stake the DAO's token in its pool (vortex-stake), not here;
+//!   one token, one vote. Proposing, quorum, approval, timelock and
+//!   execution work as in token-weighted, and each proposal keeps the pool
+//!   it was made in.
+//! - **Delegating** hands a member's unlocked stake to a delegate. The stake
+//!   is locked in the pool for this governance while delegated (the member
+//!   and this governance both sign the lock), so the delegate's running
+//!   total of everything delegated to it stays right, and a delegate's vote
+//!   counts their own stake plus that total straight away. Nobody has to
+//!   come back afterwards to add delegators' votes one by one (the EVM
+//!   version needs a keeper for that).
 //! - **Overriding:** a member who delegated can still vote on any proposal
-//!   (`override_vote`). If their delegate already voted with their tokens,
-//!   that weight moves from the delegate's choice to theirs; if not, it's
-//!   set aside so the delegate's later vote doesn't count it.
+//!   (`override_vote`), with all their stake. If their delegate already
+//!   voted with their tokens, that weight moves from the delegate's choice
+//!   to theirs; if not, it's set aside so the delegate's later vote doesn't
+//!   count it.
 //! - **One hop.** A delegate can't delegate, and a member others delegate to
 //!   can't either, so every vote costs the same however many people
 //!   delegated. (The EVM version follows chains; on Solana a chain can't be
 //!   walked inside one transaction.)
-//! - **No double counting** without snapshots: deposits stay locked until
-//!   the votes they were counted in close. A delegator's deposit is also
-//!   locked while a vote their delegate cast with it is open: until then
-//!   they can't withdraw, add to it, or undelegate. They can always
-//!   override.
+//! - **No double counting** without snapshots: a vote locks the voter's
+//!   stake until it closes, and a delegator can't undelegate while a vote
+//!   their delegate cast with it is open.
+//! - **Delegations belong to a pool.** After the DAO changes its token they
+//!   only count on proposals made in the old pool; members delegate again
+//!   in the new one.
 //!
 //! Ordering is by a counter on the DAO's governance account (`seq`), bumped
 //! by every delegation and every vote: a delegate's vote includes a
@@ -30,17 +35,16 @@
 
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program::program::set_return_data;
-use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 use vortex_core::{
     execution_expired, has_approval, has_quorum, passed, proposal_state, timelock_complete, validate_instructions,
     validate_uri, GovError, Lifecycle, ProposalCore, ProposalState, StoredInstruction, Tally, VotingConfig,
-    GOVERNANCE_SEED,
+    GOVERNANCE_SEED, STAKE_SEED,
 };
 use vortex_hub::{Dao as HubDao, DaoToken};
+use vortex_stake::{LockRecord, Pool, Stake};
 
 declare_id!("CMf1cxiDNmEasmM9VQwJSz5p4RVw1A5GZUjTEy95du1W");
 
-pub const VAULT_SEED: &[u8] = b"vault";
 pub const VOTER_SEED: &[u8] = b"voter";
 pub const PROPOSAL_SEED: &[u8] = b"proposal";
 pub const VOTE_SEED: &[u8] = b"vote";
@@ -50,171 +54,146 @@ pub const OVERRIDE_SEED: &[u8] = b"override";
 pub mod vortex_liquid {
     use super::*;
 
-    /// Sets up a hub DAO in this program: its rules, token and vault. The
-    /// creator right after `vortex_hub::create_dao`, or the DAO's treasury
-    /// (inside a passed proposal) when switching to this model.
-    pub fn init_governance(ctx: Context<InitGovernance>, config: VotingConfig) -> Result<()> {
+    /// Sets up a hub DAO in this program: its rules. The DAO must have a
+    /// token on record (members stake it in the hub's pool). The creator
+    /// right after `vortex_hub::create_dao`, or the DAO's treasury (inside a
+    /// passed proposal) when switching to this model.
+    pub fn init_governance(ctx: Context<InitGovernance>, epoch: u32, config: VotingConfig) -> Result<()> {
         config.validate()?;
         let hub_dao = &ctx.accounts.hub_dao;
         let hub_dao_key = hub_dao.key();
-        let becoming_active = hub_dao.governance_program == crate::ID
-            || hub_dao.pending_switch.as_ref().is_some_and(|s| s.program == crate::ID);
-        require!(becoming_active, GovError::NotActiveGovernance);
         let treasury = vortex_hub::treasury_address(&hub_dao_key);
         let who = ctx.accounts.authority.key();
-        let first_setup = hub_dao.epoch == 1 && hub_dao.governance_program == crate::ID;
-        require!(who == treasury || (first_setup && who == hub_dao.creator), GovError::Unauthorized);
+        // Epoch 1 by the creator for the DAO's first governance; the next
+        // epoch by the treasury (a passed proposal) for a pending switch here.
+        hub_dao.check_setup(&hub_dao_key, &crate::ID, &who, epoch)?;
 
         let g = &mut ctx.accounts.governance;
         g.hub_dao = hub_dao_key;
         g.treasury = treasury;
         g.executor = vortex_hub::executor_address(&hub_dao_key);
-        g.mint = ctx.accounts.mint.key();
-        g.vault = ctx.accounts.vault.key();
         g.config = config;
         g.proposal_count = 0;
-        g.total_deposited = 0;
         g.seq = 0;
+        g.epoch = epoch;
         g.bump = ctx.bumps.governance;
-        emit!(GovernanceInitialized { hub_dao: hub_dao_key, governance: g.key(), mint: g.mint });
+        emit!(GovernanceInitialized { hub_dao: hub_dao_key, governance: g.key(), mint: ctx.accounts.dao_token.mint });
         Ok(())
     }
 
-    /// Moves `amount` of the DAO's token into the vault. A delegator's new
-    /// tokens go to their delegate's total too (pass `delegate_voter`), and
-    /// can't be added while the delegate's vote with the old amount is open.
-    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-        require!(amount > 0, GovError::InvalidAmount);
-        let now = Clock::get()?.unix_timestamp;
-        let voter = &mut ctx.accounts.voter;
-        if voter.owner == Pubkey::default() {
-            voter.governance = ctx.accounts.governance.key();
-            voter.owner = ctx.accounts.owner.key();
-            voter.bump = ctx.bumps.voter;
-        }
-        if voter.delegate != Pubkey::default() {
-            // Not while a vote counting the old amount is open (theirs or the delegate's).
-            require!(now >= voter.locked_until, GovError::TokensLocked);
-            let d = delegate_of(voter, ctx.accounts.delegate_voter.as_deref_mut())?;
-            require!(now >= d.power_locked_until, GovError::DelegationLocked);
-            d.delegated_power = d.delegated_power.checked_add(amount).ok_or(GovError::Overflow)?;
-        }
-        token_interface::transfer_checked(
-            CpiContext::new(
-                ctx.accounts.token_program.key(),
-                TransferChecked {
-                    from: ctx.accounts.owner_token_account.to_account_info(),
-                    mint: ctx.accounts.mint.to_account_info(),
-                    to: ctx.accounts.vault.to_account_info(),
-                    authority: ctx.accounts.owner.to_account_info(),
-                },
-            ),
-            amount,
-            ctx.accounts.mint.decimals,
-        )?;
-        let voter = &mut ctx.accounts.voter;
-        voter.amount = voter.amount.checked_add(amount).ok_or(GovError::Overflow)?;
-        let g = &mut ctx.accounts.governance;
-        g.total_deposited = g.total_deposited.checked_add(amount).ok_or(GovError::Overflow)?;
-        emit!(Deposited { governance: g.key(), owner: voter.owner, amount, total: voter.amount });
-        Ok(())
-    }
-
-    /// Takes `amount` back out, once the votes it was counted in (the
-    /// member's own, and their delegate's) have closed.
-    pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
-        require!(amount > 0, GovError::InvalidAmount);
-        let now = Clock::get()?.unix_timestamp;
-        let voter = &mut ctx.accounts.voter;
-        require!(now >= voter.locked_until, GovError::TokensLocked);
-        require!(amount <= voter.amount, GovError::InsufficientDeposit);
-        if voter.delegate != Pubkey::default() {
-            let d = delegate_of(voter, ctx.accounts.delegate_voter.as_deref_mut())?;
-            require!(now >= d.power_locked_until, GovError::DelegationLocked);
-            d.delegated_power -= amount;
-        }
-        voter.amount -= amount;
-        let g = &mut ctx.accounts.governance;
-        g.total_deposited -= amount;
-
-        let hub_dao = g.hub_dao;
-        let seeds: &[&[u8]] = &[GOVERNANCE_SEED, hub_dao.as_ref(), &[g.bump]];
-        token_interface::transfer_checked(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.key(),
-                TransferChecked {
-                    from: ctx.accounts.vault.to_account_info(),
-                    mint: ctx.accounts.mint.to_account_info(),
-                    to: ctx.accounts.owner_token_account.to_account_info(),
-                    authority: g.to_account_info(),
-                },
-                &[seeds],
-            ),
-            amount,
-            ctx.accounts.mint.decimals,
-        )?;
-        emit!(Withdrawn { governance: g.key(), owner: voter.owner, amount, total: voter.amount });
-        Ok(())
-    }
-
-    /// Hands the member's votes to `to`. Not while a vote of their own is
-    /// open (it would count twice), and only one hop: `to` can't have
+    /// Hands the member's unlocked stake in the DAO's current pool to `to`,
+    /// locking it there for this governance. Not while a vote of their own
+    /// is open (it would count twice), and only one hop: `to` can't have
     /// delegated, and nobody can be delegating to the member.
     pub fn delegate(ctx: Context<Delegate>, to: Pubkey) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
         let owner = ctx.accounts.owner.key();
         require_keys_neq!(to, owner, GovError::SelfDelegation);
         require!(to != Pubkey::default(), GovError::InvalidConfig);
+        let pool = ctx.accounts.pool.key();
         let g = &mut ctx.accounts.governance;
         let voter = &mut ctx.accounts.voter;
+        init_voter(voter, g.key(), owner, ctx.bumps.voter);
         require!(voter.delegate == Pubkey::default(), GovError::AlreadyDelegated);
         require!(voter.delegators == 0, GovError::HasDelegators);
         require!(now >= voter.locked_until, GovError::TokensLocked);
+        let s = &ctx.accounts.stake;
+        let amount = s.amount - s.locked;
+        require!(amount > 0, GovError::NoVotingPower);
 
         let d = &mut ctx.accounts.delegate_voter;
-        if d.owner == Pubkey::default() {
-            d.governance = g.key();
-            d.owner = to;
-            d.bump = ctx.bumps.delegate_voter;
-        }
+        init_voter(d, g.key(), to, ctx.bumps.delegate_voter);
         require!(d.delegate == Pubkey::default(), GovError::DelegateHasDelegated);
-        d.delegated_power = d.delegated_power.checked_add(voter.amount).ok_or(GovError::Overflow)?;
+        // A delegate's total is in one pool: after a token change it starts again.
+        require!(d.delegated_power == 0 || d.power_pool == pool, GovError::WrongPool);
+        d.power_pool = pool;
+        d.delegated_power = d.delegated_power.checked_add(amount).ok_or(GovError::Overflow)?;
         d.delegators += 1;
         g.seq += 1;
         voter.delegate = to;
+        voter.pool = pool;
+        voter.delegated_amount = amount;
         voter.delegated_seq = g.seq;
-        emit!(DelegateChanged { governance: g.key(), member: owner, delegate: to, amount: voter.amount });
+
+        let g = &ctx.accounts.governance;
+        let hub_dao = g.hub_dao;
+        let epoch_bytes = g.epoch.to_le_bytes();
+        let seeds: &[&[u8]] = &[GOVERNANCE_SEED, hub_dao.as_ref(), &epoch_bytes, &[g.bump]];
+        vortex_stake::cpi::lock(
+            CpiContext::new_with_signer(
+                ctx.accounts.stake_program.key(),
+                vortex_stake::cpi::accounts::Lock {
+                    owner: ctx.accounts.owner.to_account_info(),
+                    governance: g.to_account_info(),
+                    hub_dao: ctx.accounts.hub_dao.to_account_info(),
+                    pool: ctx.accounts.pool.to_account_info(),
+                    stake: ctx.accounts.stake.to_account_info(),
+                    lock: ctx.accounts.lock.to_account_info(),
+                    system_program: ctx.accounts.system_program.to_account_info(),
+                },
+                &[seeds],
+            ),
+            amount,
+        )?;
+        emit!(DelegateChanged { governance: g.key(), member: owner, delegate: to, amount });
         Ok(())
     }
 
-    /// Takes the member's votes back, once every vote their delegate cast
-    /// with them has closed.
+    /// Takes the member's votes back and unlocks their stake, once every
+    /// vote their delegate cast with them has closed. Works after the DAO
+    /// has switched away from this governance, so nobody's stake is stuck.
     pub fn undelegate(ctx: Context<Undelegate>) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
         let voter = &mut ctx.accounts.voter;
         require!(voter.delegate != Pubkey::default(), GovError::NotDelegated);
         // An override of theirs is still open: the delegate's total has to keep matching it.
         require!(now >= voter.locked_until, GovError::TokensLocked);
-        let d = delegate_of(voter, Some(&mut *ctx.accounts.delegate_voter))?;
+        let d = &mut ctx.accounts.delegate_voter;
         require!(now >= d.power_locked_until, GovError::DelegationLocked);
-        d.delegated_power -= voter.amount;
+        let amount = voter.delegated_amount;
+        d.delegated_power -= amount;
         d.delegators -= 1;
         voter.delegate = Pubkey::default();
-        emit!(DelegateChanged { governance: voter.governance, member: voter.owner, delegate: Pubkey::default(), amount: voter.amount });
+        voter.delegated_amount = 0;
+
+        let g = &ctx.accounts.governance;
+        let hub_dao = g.hub_dao;
+        let epoch_bytes = g.epoch.to_le_bytes();
+        let seeds: &[&[u8]] = &[GOVERNANCE_SEED, hub_dao.as_ref(), &epoch_bytes, &[g.bump]];
+        vortex_stake::cpi::unlock(
+            CpiContext::new_with_signer(
+                ctx.accounts.stake_program.key(),
+                vortex_stake::cpi::accounts::Unlock {
+                    governance: g.to_account_info(),
+                    stake: ctx.accounts.stake.to_account_info(),
+                    lock: ctx.accounts.lock.to_account_info(),
+                },
+                &[seeds],
+            ),
+            amount,
+        )?;
+        emit!(DelegateChanged { governance: voter.governance, member: voter.owner, delegate: Pubkey::default(), amount });
         Ok(())
     }
 
     /// Proposes `instructions` for the treasury to run if the vote passes.
     /// `id` must be the next proposal number. The proposer's voting power
-    /// (own deposit plus what's delegated to them) must meet the threshold.
+    /// (own stake plus what's delegated to them in the current pool) must
+    /// meet the threshold.
     pub fn propose(ctx: Context<Propose>, id: u64, metadata_uri: String, instructions: Vec<StoredInstruction>) -> Result<()> {
         let hub_dao = &ctx.accounts.hub_dao;
         require_keys_eq!(hub_dao.governance_program, crate::ID, GovError::NotActiveGovernance);
+        let pool = &ctx.accounts.pool;
         let g = &mut ctx.accounts.governance;
         require!(id == g.proposal_count + 1, GovError::WrongDao);
         validate_uri(&metadata_uri)?;
         validate_instructions(&instructions, &g.treasury)?;
-        let power = ctx.accounts.voter.as_ref().map_or(0, |v| if v.delegate == Pubkey::default() { v.amount.saturating_add(v.delegated_power) } else { 0 });
+        let own = ctx.accounts.proposer_stake.as_ref().map_or(0, |s| s.amount);
+        let power = match ctx.accounts.voter.as_ref() {
+            Some(v) if v.delegate != Pubkey::default() => 0,
+            Some(v) if v.power_pool == pool.key() => own.saturating_add(v.delegated_power),
+            _ => own,
+        };
         require!(power >= g.config.proposal_threshold, GovError::ProposalThresholdNotMet);
 
         let now = Clock::get()?.unix_timestamp;
@@ -225,10 +204,11 @@ pub mod vortex_liquid {
         p.id = id;
         p.proposer = ctx.accounts.proposer.key();
         p.metadata_uri = metadata_uri;
+        p.pool = pool.key();
         p.created_at = now;
         p.voting_starts_at = now + g.config.voting_delay as i64;
         p.voting_ends_at = p.voting_starts_at + g.config.voting_period as i64;
-        p.quorum_base = g.total_deposited;
+        p.quorum_base = pool.total;
         p.tally = Tally::default();
         p.queued_at = 0;
         p.executed = false;
@@ -246,44 +226,50 @@ pub mod vortex_liquid {
         Ok(())
     }
 
-    /// A member who hasn't delegated votes with their deposit plus
-    /// everything delegated to them, minus what delegators already voted
-    /// themselves on this proposal (`overrides`, always this proposal's and
-    /// this member's, so it can't be left out).
+    /// A member who hasn't delegated votes with their stake in the
+    /// proposal's pool plus everything delegated to them there, minus what
+    /// delegators already voted themselves on this proposal (`overrides`,
+    /// always this proposal's and this member's, so it can't be left out).
     pub fn cast_vote(ctx: Context<CastVote>, choice: VoteChoice) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
         let p = &mut ctx.accounts.proposal;
         open_for_votes(p, now)?;
+        let owner = ctx.accounts.owner.key();
+        let g_key = ctx.accounts.governance.key();
         let voter = &mut ctx.accounts.voter;
+        init_voter(voter, g_key, owner, ctx.bumps.voter);
         require!(voter.delegate == Pubkey::default(), GovError::AlreadyDelegated);
         let overridden = read_override(&ctx.accounts.overrides)?;
-        let delegated = voter.delegated_power.saturating_sub(overridden);
-        let weight = voter.amount.checked_add(delegated).ok_or(GovError::Overflow)?;
+        let power = if voter.power_pool == p.pool { voter.delegated_power } else { 0 };
+        let delegated = power.saturating_sub(overridden);
+        let weight = ctx.accounts.stake.amount.checked_add(delegated).ok_or(GovError::Overflow)?;
         require!(weight > 0, GovError::NoVotingPower);
         add_vote(&mut p.tally, choice, weight)?;
         voter.locked_until = voter.locked_until.max(p.voting_ends_at);
-        if voter.delegated_power > 0 {
+        if power > 0 {
             voter.power_locked_until = voter.power_locked_until.max(p.voting_ends_at);
         }
+        let ends = p.voting_ends_at;
+        lock_stake_until(&ctx.accounts.governance, &ctx.accounts.owner, &ctx.accounts.hub_dao, &ctx.accounts.pool, &ctx.accounts.stake, &ctx.accounts.stake_program, ends)?;
 
         let g = &mut ctx.accounts.governance;
         g.seq += 1;
         let record = &mut ctx.accounts.vote_record;
         record.proposal = p.key();
-        record.voter = voter.owner;
+        record.voter = owner;
         record.choice = choice;
         record.weight = weight;
         record.delegated = delegated;
         record.seq = g.seq;
         record.bump = ctx.bumps.vote_record;
-        emit!(VoteCast { hub_dao: p.core.hub_dao, proposal: p.key(), id: p.id, voter: voter.owner, choice, weight, delegated });
+        emit!(VoteCast { hub_dao: p.core.hub_dao, proposal: p.key(), id: p.id, voter: owner, choice, weight, delegated });
         Ok(())
     }
 
-    /// A member who delegated votes themselves on this proposal. If their
-    /// delegate already voted with their tokens, that weight moves from the
-    /// delegate's choice to this one; otherwise it's set aside so the
-    /// delegate's later vote leaves it out.
+    /// A member who delegated votes themselves on this proposal, with all
+    /// their stake in its pool. If their delegate already voted with their
+    /// delegated tokens, that weight moves from the delegate's choice;
+    /// otherwise it's set aside so the delegate's later vote leaves it out.
     pub fn override_vote(ctx: Context<OverrideVote>, choice: VoteChoice) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
         let p = &mut ctx.accounts.proposal;
@@ -291,44 +277,50 @@ pub mod vortex_liquid {
         let voter = &mut ctx.accounts.voter;
         require!(voter.delegate != Pubkey::default(), GovError::NotDelegated);
         require_keys_eq!(ctx.accounts.delegate_voter.owner, voter.delegate, GovError::WrongDelegate);
-        let weight = voter.amount;
+        let weight = ctx.accounts.stake.amount;
         require!(weight > 0, GovError::NoVotingPower);
+        // What the delegate counts of theirs on this proposal: only delegations in its pool.
+        let handed = if voter.pool == p.pool { voter.delegated_amount } else { 0 };
 
         let delegate_record = &ctx.accounts.delegate_record;
         let mut moved = false;
-        if delegate_record.owner == &crate::ID && !delegate_record.data_is_empty() {
-            let mut rec = VoteRecord::try_deserialize(&mut &delegate_record.try_borrow_data()?[..])?;
-            // The delegate's vote included this member's tokens only if it came after the delegation.
-            if rec.seq > voter.delegated_seq {
-                sub_vote(&mut p.tally, rec.choice, weight)?;
-                rec.weight = rec.weight.saturating_sub(weight);
-                rec.delegated = rec.delegated.saturating_sub(weight);
-                rec.try_serialize(&mut &mut delegate_record.try_borrow_mut_data()?[..])?;
-                moved = true;
+        if handed > 0 {
+            if delegate_record.owner == &crate::ID && !delegate_record.data_is_empty() {
+                let mut rec = VoteRecord::try_deserialize(&mut &delegate_record.try_borrow_data()?[..])?;
+                // The delegate's vote included this member's tokens only if it came after the delegation.
+                if rec.seq > voter.delegated_seq {
+                    sub_vote(&mut p.tally, rec.choice, handed)?;
+                    rec.weight = rec.weight.saturating_sub(handed);
+                    rec.delegated = rec.delegated.saturating_sub(handed);
+                    rec.try_serialize(&mut &mut delegate_record.try_borrow_mut_data()?[..])?;
+                    moved = true;
+                }
+            } else {
+                let o = &mut ctx.accounts.overrides;
+                if o.proposal == Pubkey::default() {
+                    o.proposal = p.key();
+                    o.delegate = voter.delegate;
+                    o.bump = ctx.bumps.overrides;
+                }
+                o.power = o.power.checked_add(handed).ok_or(GovError::Overflow)?;
             }
-        } else {
-            let o = &mut ctx.accounts.overrides;
-            if o.proposal == Pubkey::default() {
-                o.proposal = p.key();
-                o.delegate = voter.delegate;
-                o.bump = ctx.bumps.overrides;
-            }
-            o.power = o.power.checked_add(weight).ok_or(GovError::Overflow)?;
         }
         add_vote(&mut p.tally, choice, weight)?;
         voter.locked_until = voter.locked_until.max(p.voting_ends_at);
+        let (owner, delegate, ends) = (voter.owner, voter.delegate, p.voting_ends_at);
+        lock_stake_until(&ctx.accounts.governance, &ctx.accounts.owner, &ctx.accounts.hub_dao, &ctx.accounts.pool, &ctx.accounts.stake, &ctx.accounts.stake_program, ends)?;
 
         let g = &mut ctx.accounts.governance;
         g.seq += 1;
         let record = &mut ctx.accounts.vote_record;
         record.proposal = p.key();
-        record.voter = voter.owner;
+        record.voter = owner;
         record.choice = choice;
         record.weight = weight;
         record.delegated = 0;
         record.seq = g.seq;
         record.bump = ctx.bumps.vote_record;
-        emit!(VoteOverridden { hub_dao: p.core.hub_dao, proposal: p.key(), id: p.id, voter: voter.owner, delegate: voter.delegate, choice, weight, moved });
+        emit!(VoteOverridden { hub_dao: p.core.hub_dao, proposal: p.key(), id: p.id, voter: owner, delegate, choice, weight, moved });
         Ok(())
     }
 
@@ -402,6 +394,44 @@ pub mod vortex_liquid {
 // HELPERS
 // ---------------------------------------------------------------
 
+fn init_voter(v: &mut Voter, governance: Pubkey, owner: Pubkey, bump: u8) {
+    if v.owner == Pubkey::default() {
+        v.governance = governance;
+        v.owner = owner;
+        v.bump = bump;
+    }
+}
+
+/// Holds the voter's stake in the proposal's pool until voting ends (the
+/// member and this governance both sign).
+fn lock_stake_until<'info>(
+    g: &Account<'info, Governance>,
+    owner: &Signer<'info>,
+    hub_dao: &Account<'info, HubDao>,
+    pool: &Account<'info, Pool>,
+    stake: &Account<'info, Stake>,
+    stake_program: &Program<'info, vortex_stake::program::VortexStake>,
+    until: i64,
+) -> Result<()> {
+    let hub = g.hub_dao;
+    let epoch_bytes = g.epoch.to_le_bytes();
+    let seeds: &[&[u8]] = &[GOVERNANCE_SEED, hub.as_ref(), &epoch_bytes, &[g.bump]];
+    vortex_stake::cpi::lock_until(
+        CpiContext::new_with_signer(
+            stake_program.key(),
+            vortex_stake::cpi::accounts::LockUntil {
+                owner: owner.to_account_info(),
+                governance: g.to_account_info(),
+                hub_dao: hub_dao.to_account_info(),
+                pool: pool.to_account_info(),
+                stake: stake.to_account_info(),
+            },
+            &[seeds],
+        ),
+        until,
+    )
+}
+
 fn open_for_votes(p: &Proposal, now: i64) -> Result<()> {
     require!(!p.cancelled && !p.executed, GovError::ProposalNotActive);
     require!(now >= p.voting_starts_at && now < p.voting_ends_at, GovError::ProposalNotActive);
@@ -428,14 +458,6 @@ fn sub_vote(t: &mut Tally, choice: VoteChoice, weight: u64) -> Result<()> {
     Ok(())
 }
 
-/// The delegate's account, which must be passed (and be the right one) when the member has delegated.
-fn delegate_of<'a>(voter: &Voter, d: Option<&'a mut Voter>) -> Result<&'a mut Voter> {
-    let d = d.ok_or(GovError::WrongDelegate)?;
-    require_keys_eq!(d.owner, voter.delegate, GovError::WrongDelegate);
-    require_keys_eq!(d.governance, voter.governance, GovError::WrongDao);
-    Ok(d)
-}
-
 /// Power delegators set aside on this proposal before the delegate voted (0 if none).
 fn read_override(account: &UncheckedAccount) -> Result<u64> {
     if account.owner != &crate::ID || account.data_is_empty() {
@@ -454,33 +476,36 @@ pub struct Governance {
     pub hub_dao: Pubkey,
     pub treasury: Pubkey,
     pub executor: Pubkey,
-    pub mint: Pubkey,
-    pub vault: Pubkey,
     pub config: VotingConfig,
     pub proposal_count: u64,
-    pub total_deposited: u64,
     /// Bumped by every delegation and vote, to order them.
     pub seq: u64,
+    /// The hub epoch this setup is for (part of its address).
+    pub epoch: u32,
     pub bump: u8,
 }
 
+/// A member's delegation state here. Their stake is in the hub's pool.
 #[account]
 #[derive(InitSpace)]
 pub struct Voter {
     pub governance: Pubkey,
     pub owner: Pubkey,
-    /// Deposited tokens (raw).
-    pub amount: u64,
-    /// Can't withdraw or delegate before this: the end of the latest vote they cast.
+    /// Can't delegate or undelegate before this: the end of the latest vote they cast.
     pub locked_until: i64,
     /// Who they've delegated to (default = nobody).
     pub delegate: Pubkey,
+    /// The pool their delegation is in.
+    pub pool: Pubkey,
+    /// What they delegated (locked in `pool` for this governance).
+    pub delegated_amount: u64,
     /// `seq` when they last delegated.
     pub delegated_seq: u64,
-    /// Sum of the deposits delegated to them.
+    /// Sum of the stake delegated to them, all in `power_pool`.
     pub delegated_power: u64,
+    pub power_pool: Pubkey,
     pub delegators: u32,
-    /// Their delegators' deposits are locked until this: the end of the latest vote they cast with them.
+    /// Their delegators can't undelegate before this: the end of the latest vote they cast with them.
     pub power_locked_until: i64,
     pub bump: u8,
 }
@@ -492,10 +517,12 @@ pub struct Proposal {
     pub id: u64,
     pub proposer: Pubkey,
     pub metadata_uri: String,
+    /// The DAO's stake pool when proposed: votes count stake there.
+    pub pool: Pubkey,
     pub created_at: i64,
     pub voting_starts_at: i64,
     pub voting_ends_at: i64,
-    /// All deposits when proposed: what quorum is measured against.
+    /// Everything in the pool when proposed: what quorum is measured against.
     pub quorum_base: u64,
     pub tally: Tally,
     pub queued_at: i64,
@@ -509,6 +536,7 @@ impl Proposal {
         8 + (32 + 4 + vortex_core::instructions_len(instructions))
             + 32 + 8 + 32
             + (4 + metadata_uri.len())
+            + 32
             + 8 * 3 + 8 + Tally::INIT_SPACE + 8 + 1 + 1 + 1
     }
 
@@ -565,79 +593,19 @@ pub enum VoteChoice {
 // ---------------------------------------------------------------
 
 #[derive(Accounts)]
+#[instruction(epoch: u32)]
 pub struct InitGovernance<'info> {
     pub authority: Signer<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
     pub hub_dao: Account<'info, HubDao>,
-    #[account(init, payer = payer, space = 8 + Governance::INIT_SPACE, seeds = [GOVERNANCE_SEED, hub_dao.key().as_ref()], bump)]
+    #[account(init, payer = payer, space = 8 + Governance::INIT_SPACE, seeds = [GOVERNANCE_SEED, hub_dao.key().as_ref(), &epoch.to_le_bytes()], bump)]
     pub governance: Account<'info, Governance>,
-    pub mint: InterfaceAccount<'info, Mint>,
-    /// The DAO's token on record at the hub (set_dao_token): setting up -
-    /// a switch included - only works with that mint.
-    #[account(
-        seeds = [vortex_hub::TOKEN_SEED, hub_dao.key().as_ref()],
-        bump = dao_token.bump,
-        seeds::program = vortex_hub::ID,
-        constraint = dao_token.mint == mint.key() @ GovError::WrongMint,
-    )]
+    /// The DAO's token on record at the hub (set_dao_token): a token model
+    /// needs one, as members stake it in the hub's pool.
+    #[account(seeds = [vortex_hub::TOKEN_SEED, hub_dao.key().as_ref()], bump = dao_token.bump, seeds::program = vortex_hub::ID)]
     pub dao_token: Account<'info, DaoToken>,
-    #[account(
-        init,
-        payer = payer,
-        seeds = [VAULT_SEED, governance.key().as_ref()],
-        bump,
-        token::mint = mint,
-        token::authority = governance,
-        token::token_program = token_program,
-    )]
-    pub vault: InterfaceAccount<'info, TokenAccount>,
-    pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct Deposit<'info> {
-    #[account(mut)]
-    pub owner: Signer<'info>,
-    #[account(mut, has_one = mint @ GovError::WrongDao, has_one = vault @ GovError::WrongDao)]
-    pub governance: Account<'info, Governance>,
-    #[account(
-        init_if_needed,
-        payer = owner,
-        space = 8 + Voter::INIT_SPACE,
-        seeds = [VOTER_SEED, governance.key().as_ref(), owner.key().as_ref()],
-        bump,
-    )]
-    pub voter: Account<'info, Voter>,
-    /// The member's delegate, when they've delegated.
-    #[account(mut)]
-    pub delegate_voter: Option<Account<'info, Voter>>,
-    #[account(mut, token::mint = mint, token::authority = owner, token::token_program = token_program)]
-    pub owner_token_account: InterfaceAccount<'info, TokenAccount>,
-    #[account(mut)]
-    pub vault: InterfaceAccount<'info, TokenAccount>,
-    pub mint: InterfaceAccount<'info, Mint>,
-    pub token_program: Interface<'info, TokenInterface>,
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct Withdraw<'info> {
-    pub owner: Signer<'info>,
-    #[account(mut, has_one = mint @ GovError::WrongDao, has_one = vault @ GovError::WrongDao)]
-    pub governance: Account<'info, Governance>,
-    #[account(mut, seeds = [VOTER_SEED, governance.key().as_ref(), owner.key().as_ref()], bump = voter.bump)]
-    pub voter: Account<'info, Voter>,
-    /// The member's delegate, when they've delegated.
-    #[account(mut)]
-    pub delegate_voter: Option<Account<'info, Voter>>,
-    #[account(mut, token::mint = mint, token::token_program = token_program)]
-    pub owner_token_account: InterfaceAccount<'info, TokenAccount>,
-    #[account(mut)]
-    pub vault: InterfaceAccount<'info, TokenAccount>,
-    pub mint: InterfaceAccount<'info, Mint>,
-    pub token_program: Interface<'info, TokenInterface>,
 }
 
 #[derive(Accounts)]
@@ -645,11 +613,22 @@ pub struct Withdraw<'info> {
 pub struct Delegate<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
-    #[account(mut)]
+    #[account(mut, has_one = hub_dao @ GovError::WrongDao)]
     pub governance: Account<'info, Governance>,
-    #[account(mut, seeds = [VOTER_SEED, governance.key().as_ref(), owner.key().as_ref()], bump = voter.bump)]
+    pub hub_dao: Account<'info, HubDao>,
+    #[account(seeds = [vortex_hub::TOKEN_SEED, hub_dao.key().as_ref()], bump = dao_token.bump, seeds::program = vortex_hub::ID)]
+    pub dao_token: Account<'info, DaoToken>,
+    /// Delegations are made in the DAO's current pool.
+    #[account(address = dao_token.pool @ GovError::PoolNotCurrent)]
+    pub pool: Account<'info, Pool>,
+    #[account(mut, seeds = [STAKE_SEED, pool.key().as_ref(), owner.key().as_ref()], bump = stake.bump, seeds::program = vortex_stake::ID)]
+    pub stake: Account<'info, Stake>,
+    /// CHECK: vortex-stake's lock record for this stake and governance, made or checked there.
+    #[account(mut)]
+    pub lock: UncheckedAccount<'info>,
+    #[account(init_if_needed, payer = owner, space = 8 + Voter::INIT_SPACE, seeds = [VOTER_SEED, governance.key().as_ref(), owner.key().as_ref()], bump)]
     pub voter: Account<'info, Voter>,
-    /// The delegate's account, made here if they've never deposited.
+    /// The delegate's account, made here if they've never voted.
     #[account(
         init_if_needed,
         payer = owner,
@@ -658,6 +637,7 @@ pub struct Delegate<'info> {
         bump,
     )]
     pub delegate_voter: Account<'info, Voter>,
+    pub stake_program: Program<'info, vortex_stake::program::VortexStake>,
     pub system_program: Program<'info, System>,
 }
 
@@ -669,6 +649,12 @@ pub struct Undelegate<'info> {
     pub voter: Account<'info, Voter>,
     #[account(mut, seeds = [VOTER_SEED, governance.key().as_ref(), voter.delegate.as_ref()], bump = delegate_voter.bump)]
     pub delegate_voter: Account<'info, Voter>,
+    /// The member's stake in the delegation's pool.
+    #[account(mut, seeds = [STAKE_SEED, voter.pool.as_ref(), owner.key().as_ref()], bump = stake.bump, seeds::program = vortex_stake::ID)]
+    pub stake: Account<'info, Stake>,
+    #[account(mut)]
+    pub lock: Account<'info, LockRecord>,
+    pub stake_program: Program<'info, vortex_stake::program::VortexStake>,
 }
 
 #[derive(Accounts)]
@@ -679,6 +665,13 @@ pub struct Propose<'info> {
     #[account(mut, has_one = hub_dao @ GovError::WrongDao)]
     pub governance: Account<'info, Governance>,
     pub hub_dao: Account<'info, HubDao>,
+    #[account(seeds = [vortex_hub::TOKEN_SEED, hub_dao.key().as_ref()], bump = dao_token.bump, seeds::program = vortex_hub::ID)]
+    pub dao_token: Account<'info, DaoToken>,
+    /// The DAO's current pool, which the proposal keeps.
+    #[account(address = dao_token.pool @ GovError::PoolNotCurrent)]
+    pub pool: Account<'info, Pool>,
+    #[account(seeds = [STAKE_SEED, pool.key().as_ref(), proposer.key().as_ref()], bump, seeds::program = vortex_stake::ID)]
+    pub proposer_stake: Option<Account<'info, Stake>>,
     #[account(seeds = [VOTER_SEED, governance.key().as_ref(), proposer.key().as_ref()], bump)]
     pub voter: Option<Account<'info, Voter>>,
     #[account(
@@ -696,11 +689,15 @@ pub struct Propose<'info> {
 pub struct CastVote<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
-    #[account(mut)]
+    #[account(mut, has_one = hub_dao @ GovError::WrongDao)]
     pub governance: Account<'info, Governance>,
-    #[account(mut, has_one = governance @ GovError::WrongDao)]
+    pub hub_dao: Account<'info, HubDao>,
+    #[account(mut, has_one = governance @ GovError::WrongDao, has_one = pool @ GovError::WrongPool)]
     pub proposal: Account<'info, Proposal>,
-    #[account(mut, seeds = [VOTER_SEED, governance.key().as_ref(), owner.key().as_ref()], bump = voter.bump)]
+    pub pool: Account<'info, Pool>,
+    #[account(mut, seeds = [STAKE_SEED, pool.key().as_ref(), owner.key().as_ref()], bump = stake.bump, seeds::program = vortex_stake::ID)]
+    pub stake: Account<'info, Stake>,
+    #[account(init_if_needed, payer = owner, space = 8 + Voter::INIT_SPACE, seeds = [VOTER_SEED, governance.key().as_ref(), owner.key().as_ref()], bump)]
     pub voter: Account<'info, Voter>,
     /// What delegators set aside on this proposal (may not exist yet).
     /// CHECK: address fixed by the seeds; read only if this program owns it.
@@ -714,6 +711,7 @@ pub struct CastVote<'info> {
         bump,
     )]
     pub vote_record: Account<'info, VoteRecord>,
+    pub stake_program: Program<'info, vortex_stake::program::VortexStake>,
     pub system_program: Program<'info, System>,
 }
 
@@ -721,14 +719,18 @@ pub struct CastVote<'info> {
 pub struct OverrideVote<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
-    #[account(mut)]
+    #[account(mut, has_one = hub_dao @ GovError::WrongDao)]
     pub governance: Account<'info, Governance>,
-    #[account(mut, has_one = governance @ GovError::WrongDao)]
-    pub proposal: Account<'info, Proposal>,
+    pub hub_dao: Account<'info, HubDao>,
+    #[account(mut, has_one = governance @ GovError::WrongDao, has_one = pool @ GovError::WrongPool)]
+    pub proposal: Box<Account<'info, Proposal>>,
+    pub pool: Box<Account<'info, Pool>>,
+    #[account(mut, seeds = [STAKE_SEED, pool.key().as_ref(), owner.key().as_ref()], bump = stake.bump, seeds::program = vortex_stake::ID)]
+    pub stake: Box<Account<'info, Stake>>,
     #[account(mut, seeds = [VOTER_SEED, governance.key().as_ref(), owner.key().as_ref()], bump = voter.bump)]
-    pub voter: Account<'info, Voter>,
+    pub voter: Box<Account<'info, Voter>>,
     #[account(seeds = [VOTER_SEED, governance.key().as_ref(), voter.delegate.as_ref()], bump = delegate_voter.bump)]
-    pub delegate_voter: Account<'info, Voter>,
+    pub delegate_voter: Box<Account<'info, Voter>>,
     /// The delegate's vote on this proposal, if they've voted.
     /// CHECK: address fixed by the seeds; read and updated only if this program owns it.
     #[account(mut, seeds = [VOTE_SEED, proposal.key().as_ref(), voter.delegate.as_ref()], bump)]
@@ -740,7 +742,7 @@ pub struct OverrideVote<'info> {
         seeds = [OVERRIDE_SEED, proposal.key().as_ref(), voter.delegate.as_ref()],
         bump,
     )]
-    pub overrides: Account<'info, Override>,
+    pub overrides: Box<Account<'info, Override>>,
     #[account(
         init,
         payer = owner,
@@ -748,7 +750,8 @@ pub struct OverrideVote<'info> {
         seeds = [VOTE_SEED, proposal.key().as_ref(), owner.key().as_ref()],
         bump,
     )]
-    pub vote_record: Account<'info, VoteRecord>,
+    pub vote_record: Box<Account<'info, VoteRecord>>,
+    pub stake_program: Program<'info, vortex_stake::program::VortexStake>,
     pub system_program: Program<'info, System>,
 }
 
@@ -808,22 +811,6 @@ pub struct GovernanceInitialized {
     pub hub_dao: Pubkey,
     pub governance: Pubkey,
     pub mint: Pubkey,
-}
-
-#[event]
-pub struct Deposited {
-    pub governance: Pubkey,
-    pub owner: Pubkey,
-    pub amount: u64,
-    pub total: u64,
-}
-
-#[event]
-pub struct Withdrawn {
-    pub governance: Pubkey,
-    pub owner: Pubkey,
-    pub amount: u64,
-    pub total: u64,
 }
 
 #[event]

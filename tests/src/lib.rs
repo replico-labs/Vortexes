@@ -22,7 +22,11 @@ pub use solana_keypair::Keypair;
 pub use solana_signer::Signer;
 pub use vortex_core::{GovError, ProposalState, StoredAccountMeta, StoredInstruction, VotingConfig, GOVERNANCE_SEED, MAX_INSTRUCTIONS};
 pub use vortex_hub as hub;
-pub use vortex_token_weighted::{self as tw, Governance, Proposal, VoteChoice, Voter};
+pub use vortex_token_weighted::{self as tw, Governance, Proposal, VoteChoice};
+pub use vortex_stake::{self as stake, Stake};
+
+/// Model-specific member accounts (liquid, conviction, sortition): `[VOTER_SEED, governance, owner]`.
+pub const VOTER_SEED: &[u8] = b"voter";
 
 pub const DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../target/deploy/");
 pub const START: i64 = 1_800_000_000;
@@ -37,6 +41,11 @@ pub const SORT: Pubkey = vortex_sortition::ID;
 pub const SOW: Pubkey = vortex_sowellian::ID;
 pub const DM: Pubkey = vortex_decision_markets::ID;
 pub const FILL: Pubkey = vortex_fill::ID;
+pub const STAKE: Pubkey = vortex_stake::ID;
+pub const DIST: Pubkey = vortex_distribution::ID;
+pub use vortex_distribution as dist;
+pub const VAULT: Pubkey = vortex_vault::ID;
+pub use vortex_vault as vault;
 pub const SYSTEM: Pubkey = anchor_lang::system_program::ID;
 
 pub fn config() -> VotingConfig {
@@ -64,6 +73,8 @@ pub struct Env {
     pub token_program: Pubkey,
     pub dao: Pubkey,
     pub treasury: Pubkey,
+    /// See `Env::pin`.
+    pub pin: std::cell::Cell<Option<(Pubkey, u32)>>,
 }
 
 impl Env {
@@ -96,6 +107,9 @@ impl Env {
             (SOW, "vortex_sowellian"),
             (DM, "vortex_decision_markets"),
             (FILL, "vortex_fill"),
+            (STAKE, "vortex_stake"),
+            (DIST, "vortex_distribution"),
+            (VAULT, "vortex_vault"),
         ] {
             if let Err(e) = svm.add_program_from_file(id, format!("{DIR}{name}.so")) {
                 panic!(
@@ -116,7 +130,7 @@ impl Env {
         } else {
             create_mint_2022(&mut svm, &creator)
         };
-        let mut env = Env { svm, admin, creator, mint, token_program, dao: Pubkey::default(), treasury: Pubkey::default() };
+        let mut env = Env { svm, admin, creator, mint, token_program, dao: Pubkey::default(), treasury: Pubkey::default(), pin: Default::default() };
 
         // The hub and its approved models.
         let admin_kp = env.admin.insecure_clone();
@@ -141,8 +155,8 @@ impl Env {
     }
 
     /// Creates the DAO in the hub and, in the same transaction, records its
-    /// token and the creator's setup in `gp` (built by `init` once the
-    /// DAO's address is known).
+    /// token, opens its stake pool, and makes the creator's setup in `gp`
+    /// (built by `init` once the DAO's address is known).
     pub fn create_dao(&mut self, name: &str, gp: Pubkey, init: impl FnOnce(&Env) -> Instruction) {
         let create_key = Keypair::new();
         self.dao = Pubkey::find_program_address(&[hub::DAO_SEED, create_key.pubkey().as_ref()], &hub::ID).0;
@@ -150,8 +164,107 @@ impl Env {
         let creator_kp = self.creator.insecure_clone();
         let create = self.ix_create_dao(name, gp, &create_key.pubkey());
         let record = self.ix_set_dao_token(&self.creator.pubkey(), self.mint, gp);
+        let pool = self.ix_create_pool(self.mint, self.token_program);
         let init = init(self);
-        self.send(&[create, record, init], &[&creator_kp, &create_key]).unwrap();
+        self.send(&[create, record, pool, init], &[&creator_kp, &create_key]).unwrap();
+    }
+
+    // ---- stake pools ----
+
+    /// The DAO's pool for `mint`.
+    pub fn pool_for(&self, mint: Pubkey) -> Pubkey {
+        vortex_core::pool_address(&self.dao, &mint)
+    }
+
+    /// The DAO's current pool (the hub's record).
+    pub fn pool(&self) -> Pubkey {
+        self.dao_token().pool
+    }
+
+    pub fn pool_vault_of(pool: &Pubkey) -> Pubkey {
+        Pubkey::find_program_address(&[stake::VAULT_SEED, pool.as_ref()], &STAKE).0
+    }
+
+    pub fn stake_pda(pool: &Pubkey, owner: &Pubkey) -> Pubkey {
+        vortex_core::stake_address(pool, owner)
+    }
+
+    /// vortex-stake's record of what `governance` locked of `owner`'s stake in `pool`.
+    pub fn lock_pda(pool: &Pubkey, owner: &Pubkey, governance: &Pubkey) -> Pubkey {
+        Pubkey::find_program_address(&[stake::LOCK_SEED, Self::stake_pda(pool, owner).as_ref(), governance.as_ref()], &STAKE).0
+    }
+
+    /// Opens the DAO's pool for `mint` (anyone can; the creator pays here).
+    pub fn ix_create_pool(&self, mint: Pubkey, token_program: Pubkey) -> Instruction {
+        let pool = self.pool_for(mint);
+        Instruction {
+            program_id: STAKE,
+            accounts: stake::accounts::CreatePool {
+                payer: self.creator.pubkey(),
+                hub_dao: self.dao,
+                mint,
+                pool,
+                vault: Self::pool_vault_of(&pool),
+                token_program,
+                system_program: SYSTEM,
+            }
+            .to_account_metas(None),
+            data: stake::instruction::CreatePool {}.data(),
+        }
+    }
+
+    /// Stakes `amount` of `mint` from `from` into the DAO's pool for it.
+    pub fn stake_into(&mut self, mint: Pubkey, token_program: Pubkey, kp: &Keypair, from: Pubkey, amount: u64) -> Result<(), FailedTransactionMetadata> {
+        let pool = self.pool_for(mint);
+        let ix = Instruction {
+            program_id: STAKE,
+            accounts: stake::accounts::StakeTokens {
+                owner: kp.pubkey(),
+                pool,
+                dao_token: hub::dao_token_address(&self.dao),
+                stake: Self::stake_pda(&pool, &kp.pubkey()),
+                owner_token_account: from,
+                vault: Self::pool_vault_of(&pool),
+                mint,
+                token_program,
+                system_program: SYSTEM,
+            }
+            .to_account_metas(None),
+            data: stake::instruction::Stake { amount }.data(),
+        };
+        self.send(&[ix], &[kp])
+    }
+
+    /// Withdraws `amount` of `mint` from the DAO's pool for it into `to`.
+    pub fn withdraw_from(&mut self, mint: Pubkey, token_program: Pubkey, kp: &Keypair, to: Pubkey, amount: u64) -> Result<(), FailedTransactionMetadata> {
+        let pool = self.pool_for(mint);
+        let ix = Instruction {
+            program_id: STAKE,
+            accounts: stake::accounts::Withdraw {
+                owner: kp.pubkey(),
+                pool,
+                stake: Self::stake_pda(&pool, &kp.pubkey()),
+                owner_token_account: to,
+                vault: Self::pool_vault_of(&pool),
+                mint,
+                token_program,
+            }
+            .to_account_metas(None),
+            data: stake::instruction::Withdraw { amount }.data(),
+        };
+        self.send(&[ix], &[kp])
+    }
+
+    /// `owner`'s stake in `pool` (zero if they never staked there).
+    pub fn stake_in(&self, pool: &Pubkey, owner: &Pubkey) -> Stake {
+        match self.svm.get_account(&Self::stake_pda(pool, owner)) {
+            Some(a) => Stake::try_deserialize(&mut a.data.as_slice()).unwrap(),
+            None => Stake { pool: *pool, owner: *owner, amount: 0, locked: 0, locked_until: 0, bump: 0 },
+        }
+    }
+
+    pub fn pool_account(&self, pool: &Pubkey) -> stake::Pool {
+        stake::Pool::try_deserialize(&mut self.svm.get_account(pool).unwrap().data.as_slice()).unwrap()
     }
 
     pub fn send(&mut self, ixs: &[Instruction], signers: &[&Keypair]) -> Result<(), FailedTransactionMetadata> {
@@ -182,16 +295,62 @@ impl Env {
         Pubkey::find_program_address(&[hub::MODEL_SEED, program.as_ref()], &hub::ID).0
     }
 
+    /// The DAO's account in `gp` for `epoch`.
+    pub fn governance_at(&self, gp: Pubkey, epoch: u32) -> Pubkey {
+        Pubkey::find_program_address(&[GOVERNANCE_SEED, self.dao.as_ref(), &epoch.to_le_bytes()], &gp).0
+    }
+
+    /// Which epoch's account `governance(gp)` means:
+    /// - the one pinned with `pin` (going back to a model the DAO ran before);
+    /// - 1 before the DAO exists (its first setup);
+    /// - the next epoch while a switch to `gp` is pending;
+    /// - the current epoch while `gp` runs the DAO;
+    /// - else the latest epoch `gp` was set up for (after a switch away);
+    /// - else the next epoch (about to be set up in a switch proposal).
+    pub fn governance_epoch(&self, gp: Pubkey) -> u32 {
+        if let Some((p, e)) = self.pin.get() {
+            if p == gp {
+                return e;
+            }
+        }
+        let Some(d) = self.try_hub_dao() else { return 1 };
+        if d.pending_switch.as_ref().is_some_and(|s| s.program == gp) {
+            return d.epoch + 1;
+        }
+        if d.governance_program == gp {
+            return d.epoch;
+        }
+        (1..=d.epoch)
+            .rev()
+            .find(|&e| self.svm.get_account(&self.governance_at(gp, e)).is_some_and(|a| a.owner == gp))
+            .unwrap_or(d.epoch + 1)
+    }
+
+    /// The DAO's account in `gp` (see `governance_epoch`).
     pub fn governance(&self, gp: Pubkey) -> Pubkey {
-        Pubkey::find_program_address(&[GOVERNANCE_SEED, self.dao.as_ref()], &gp).0
+        self.governance_at(gp, self.governance_epoch(gp))
     }
 
-    pub fn vault(&self, gp: Pubkey) -> Pubkey {
-        Pubkey::find_program_address(&[tw::VAULT_SEED, self.governance(gp).as_ref()], &gp).0
+    /// Makes `governance(gp)` mean epoch `epoch` from now on: for a switch
+    /// back to a model the DAO ran before, or to a fresh copy of the
+    /// running one.
+    pub fn pin(&self, gp: Pubkey, epoch: u32) {
+        self.pin.set(Some((gp, epoch)));
     }
 
+    fn try_hub_dao(&self) -> Option<hub::Dao> {
+        let account = self.svm.get_account(&self.dao)?;
+        hub::Dao::try_deserialize(&mut account.data.as_slice()).ok()
+    }
+
+    /// Where members' tokens sit: the vault of the DAO's current pool (any model).
+    pub fn vault(&self, _gp: Pubkey) -> Pubkey {
+        Self::pool_vault_of(&self.pool())
+    }
+
+    /// A model's own member account (liquid, conviction, sortition).
     pub fn voter_pda(&self, gp: Pubkey, owner: &Pubkey) -> Pubkey {
-        Pubkey::find_program_address(&[tw::VOTER_SEED, self.governance(gp).as_ref(), owner.as_ref()], &gp).0
+        Pubkey::find_program_address(&[VOTER_SEED, self.governance(gp).as_ref(), owner.as_ref()], &gp).0
     }
 
     pub fn proposal_pda(&self, gp: Pubkey, id: u64) -> Pubkey {
@@ -313,14 +472,11 @@ impl Env {
                 payer: *payer,
                 hub_dao: self.dao,
                 governance: self.governance(gp),
-                mint: self.mint,
                 dao_token: hub::dao_token_address(&self.dao),
-                vault: self.vault(gp),
-                token_program: self.token_program,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
-            data: tw::instruction::InitGovernance { config }.data(),
+            data: tw::instruction::InitGovernance { epoch: self.governance_epoch(gp), config }.data(),
         }
     }
 
@@ -340,55 +496,34 @@ impl Env {
         Member { kp, ata }
     }
 
-    pub fn deposit(&mut self, gp: Pubkey, m: &Member, amount: u64) -> Result<(), FailedTransactionMetadata> {
-        let ix = Instruction {
-            program_id: gp,
-            accounts: tw::accounts::Deposit {
-                owner: m.kp.pubkey(),
-                governance: self.governance(gp),
-                voter: self.voter_pda(gp, &m.kp.pubkey()),
-                owner_token_account: m.ata,
-                vault: self.vault(gp),
-                mint: self.mint,
-                token_program: self.token_program,
-                system_program: SYSTEM,
-            }
-            .to_account_metas(None),
-            data: tw::instruction::Deposit { amount }.data(),
-        };
-        self.send(&[ix], &[&m.kp])
+    /// Stakes `amount` into the DAO's current pool (whatever model runs it:
+    /// `_gp` is kept so call sites read as before).
+    pub fn deposit(&mut self, _gp: Pubkey, m: &Member, amount: u64) -> Result<(), FailedTransactionMetadata> {
+        let (mint, token_program) = (self.mint, self.token_program);
+        self.stake_into(mint, token_program, &m.kp, m.ata, amount)
     }
 
-    pub fn withdraw(&mut self, gp: Pubkey, m: &Member, amount: u64) -> Result<(), FailedTransactionMetadata> {
-        let ix = Instruction {
-            program_id: gp,
-            accounts: tw::accounts::Withdraw {
-                owner: m.kp.pubkey(),
-                governance: self.governance(gp),
-                voter: self.voter_pda(gp, &m.kp.pubkey()),
-                owner_token_account: m.ata,
-                vault: self.vault(gp),
-                mint: self.mint,
-                token_program: self.token_program,
-            }
-            .to_account_metas(None),
-            data: tw::instruction::Withdraw { amount }.data(),
-        };
-        self.send(&[ix], &[&m.kp])
+    /// Withdraws `amount` from the DAO's current pool.
+    pub fn withdraw(&mut self, _gp: Pubkey, m: &Member, amount: u64) -> Result<(), FailedTransactionMetadata> {
+        let (mint, token_program) = (self.mint, self.token_program);
+        self.withdraw_from(mint, token_program, &m.kp, m.ata, amount)
     }
 
     pub fn propose(&mut self, gp: Pubkey, m: &Member, instructions: Vec<StoredInstruction>) -> Result<(u64, Pubkey), FailedTransactionMetadata> {
         let id = self.proposal_count(gp) + 1;
         let proposal = self.proposal_pda(gp, id);
-        let voter = self.voter_pda(gp, &m.kp.pubkey());
-        let has_voter = self.svm.get_account(&voter).is_some_and(|a| a.lamports > 0);
-        let ix = Instruction {
+        let pool = self.pool();
+        let stake = Self::stake_pda(&pool, &m.kp.pubkey());
+        let has_stake = self.svm.get_account(&stake).is_some_and(|a| a.lamports > 0);
+        let mut ix = Instruction {
             program_id: gp,
             accounts: tw::accounts::Propose {
                 proposer: m.kp.pubkey(),
                 governance: self.governance(gp),
                 hub_dao: self.dao,
-                voter: has_voter.then_some(voter),
+                dao_token: hub::dao_token_address(&self.dao),
+                pool,
+                proposer_stake: has_stake.then_some(stake),
                 proposal,
                 system_program: SYSTEM,
             }
@@ -397,22 +532,25 @@ impl Env {
         };
         // Anchor marks a missing optional account with the program's own ID;
         // these are token-weighted's types, so point that at `gp`.
-        let mut ix = ix;
-        if !has_voter {
-            ix.accounts[3].pubkey = gp;
+        if !has_stake {
+            ix.accounts[5].pubkey = gp;
         }
         self.send(&[ix], &[&m.kp]).map(|_| (id, proposal))
     }
 
     pub fn vote(&mut self, gp: Pubkey, m: &Member, proposal: Pubkey, choice: VoteChoice) -> Result<(), FailedTransactionMetadata> {
+        let pool = if gp == OPT { self.opt_proposal(proposal).pool } else { self.proposal_account(proposal).pool };
         let ix = Instruction {
             program_id: gp,
             accounts: tw::accounts::CastVote {
                 owner: m.kp.pubkey(),
                 governance: self.governance(gp),
+                hub_dao: self.dao,
                 proposal,
-                voter: self.voter_pda(gp, &m.kp.pubkey()),
+                pool,
+                stake: Self::stake_pda(&pool, &m.kp.pubkey()),
                 vote_record: self.vote_pda(gp, &proposal, &m.kp.pubkey()),
+                stake_program: STAKE,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
@@ -480,6 +618,11 @@ impl Env {
         hub::DaoToken::try_deserialize(&mut self.svm.get_account(&hub::dao_token_address(&self.dao)).unwrap().data.as_slice()).unwrap()
     }
 
+    /// Any Anchor account, deserialized.
+    pub fn account<T: AccountDeserialize>(&self, key: &Pubkey) -> T {
+        T::try_deserialize(&mut self.svm.get_account(key).unwrap().data.as_slice()).unwrap()
+    }
+
     pub fn hub_dao(&self) -> hub::Dao {
         hub::Dao::try_deserialize(&mut self.svm.get_account(&self.dao).unwrap().data.as_slice()).unwrap()
     }
@@ -492,8 +635,9 @@ impl Env {
         Proposal::try_deserialize(&mut self.svm.get_account(&p).unwrap().data.as_slice()).unwrap()
     }
 
-    pub fn voter_account(&self, gp: Pubkey, owner: &Pubkey) -> Voter {
-        Voter::try_deserialize(&mut self.svm.get_account(&self.voter_pda(gp, owner)).unwrap().data.as_slice()).unwrap()
+    /// `owner`'s stake in the DAO's current pool (any model: `_gp` kept so call sites read as before).
+    pub fn voter_account(&self, _gp: Pubkey, owner: &Pubkey) -> Stake {
+        self.stake_in(&self.pool(), owner)
     }
 
     pub fn token_balance(&self, account: &Pubkey) -> u64 {
@@ -624,8 +768,9 @@ pub fn opt_config() -> OptimisticConfig {
 }
 
 impl Env {
+    /// Bonds in the DAO's current token.
     pub fn opt_bond_vault(&self) -> Pubkey {
-        Pubkey::find_program_address(&[opt::BOND_VAULT_SEED, self.governance(OPT).as_ref()], &OPT).0
+        Pubkey::find_program_address(&[opt::BOND_VAULT_SEED, self.governance(OPT).as_ref(), self.mint.as_ref()], &OPT).0
     }
 
     pub fn ix_init_optimistic(&self, authority: &Pubkey, payer: &Pubkey, config: OptimisticConfig) -> Instruction {
@@ -636,15 +781,11 @@ impl Env {
                 payer: *payer,
                 hub_dao: self.dao,
                 governance: self.governance(OPT),
-                mint: self.mint,
                 dao_token: hub::dao_token_address(&self.dao),
-                vault: self.vault(OPT),
-                bond_vault: self.opt_bond_vault(),
-                token_program: self.token_program,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
-            data: opt::instruction::InitGovernance { config }.data(),
+            data: opt::instruction::InitGovernance { epoch: self.governance_epoch(OPT), config }.data(),
         }
     }
 
@@ -671,6 +812,7 @@ impl Env {
                 bond_vault: self.opt_bond_vault(),
                 mint: self.mint,
                 token_program: self.token_program,
+                system_program: SYSTEM,
             }
             .to_account_metas(None),
             data: opt::instruction::Challenge {}.data(),
@@ -764,7 +906,7 @@ impl Env {
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
-            data: board::instruction::InitGovernance { signers, config }.data(),
+            data: board::instruction::InitGovernance { epoch: self.governance_epoch(BOARD), signers, config }.data(),
         }
     }
 
@@ -854,12 +996,11 @@ impl Env {
                 governance: self.governance(CONV),
                 mint: self.mint,
                 dao_token: hub::dao_token_address(&self.dao),
-                vault: self.vault(CONV),
                 token_program: self.token_program,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
-            data: conv::instruction::InitGovernance { config, sol_weight, token_weight }.data(),
+            data: conv::instruction::InitGovernance { epoch: self.governance_epoch(CONV), config, sol_weight, token_weight }.data(),
         }
     }
 
@@ -888,13 +1029,16 @@ impl Env {
     pub fn conv_propose(&mut self, m: &Member, instructions: Vec<StoredInstruction>, budget: Vec<AssetAmount>) -> Result<(u64, Pubkey), FailedTransactionMetadata> {
         let id = self.proposal_count(CONV) + 1;
         let proposal = self.proposal_pda(CONV, id);
-        let voter = self.voter_pda(CONV, &m.kp.pubkey());
-        let has_voter = self.svm.get_account(&voter).is_some_and(|a| a.lamports > 0);
+        let pool = self.pool();
+        let stake = Self::stake_pda(&pool, &m.kp.pubkey());
+        let has_stake = self.svm.get_account(&stake).is_some_and(|a| a.lamports > 0);
         let mut accounts = conv::accounts::Propose {
             proposer: m.kp.pubkey(),
             governance: self.governance(CONV),
             hub_dao: self.dao,
-            voter: has_voter.then_some(voter),
+            dao_token: hub::dao_token_address(&self.dao),
+            pool,
+            proposer_stake: has_stake.then_some(stake),
             proposal,
             system_program: SYSTEM,
         }
@@ -948,9 +1092,15 @@ impl Env {
             accounts: conv::accounts::Support {
                 owner: m.kp.pubkey(),
                 governance: self.governance(CONV),
+                hub_dao: self.dao,
                 voter: self.voter_pda(CONV, &m.kp.pubkey()),
                 proposal: p,
                 previous,
+                pool: self.conv_proposal(p).pool,
+                stake: Self::stake_pda(&self.conv_proposal(p).pool, &m.kp.pubkey()),
+                lock: Self::lock_pda(&self.conv_proposal(p).pool, &m.kp.pubkey(), &self.governance(CONV)),
+                stake_program: STAKE,
+                system_program: SYSTEM,
             }
             .to_account_metas(None),
             data: conv::instruction::Support {}.data(),
@@ -966,6 +1116,9 @@ impl Env {
                 governance: self.governance(CONV),
                 voter: self.voter_pda(CONV, &m.kp.pubkey()),
                 proposal: p,
+                stake: Self::stake_pda(&self.conv_proposal(p).pool, &m.kp.pubkey()),
+                lock: Self::lock_pda(&self.conv_proposal(p).pool, &m.kp.pubkey(), &self.governance(CONV)),
+                stake_program: STAKE,
             }
             .to_account_metas(None),
             data: conv::instruction::WithdrawSupport {}.data(),
@@ -1014,14 +1167,11 @@ impl Env {
                 payer: *payer,
                 hub_dao: self.dao,
                 governance: self.governance(DEL),
-                mint: self.mint,
                 dao_token: hub::dao_token_address(&self.dao),
-                vault: self.vault(DEL),
-                token_program: self.token_program,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
-            data: del::instruction::InitGovernance { council, config }.data(),
+            data: del::instruction::InitGovernance { epoch: self.governance_epoch(DEL), council, config }.data(),
         }
     }
 
@@ -1079,25 +1229,36 @@ impl Env {
         let election = self.election_pda(id);
         let ix = Instruction {
             program_id: DEL,
-            accounts: del::accounts::StartElection { payer: self.admin.pubkey(), governance: self.governance(DEL), election, system_program: SYSTEM }
-                .to_account_metas(None),
+            accounts: del::accounts::StartElection {
+                payer: self.admin.pubkey(),
+                governance: self.governance(DEL),
+                hub_dao: self.dao,
+                dao_token: hub::dao_token_address(&self.dao),
+                pool: self.pool(),
+                election,
+                system_program: SYSTEM,
+            }
+            .to_account_metas(None),
             data: del::instruction::StartElection { id }.data(),
         };
         let admin = self.admin.insecure_clone();
         self.send(&[ix], &[&admin]).map(|_| election)
     }
 
-    pub fn declare(&mut self, m: &Member, e: Pubkey) -> Result<(), FailedTransactionMetadata> {
+    pub fn declare(&mut self, m: &Member, e: Pubkey, seat: u8) -> Result<(), FailedTransactionMetadata> {
         let ix = Instruction {
             program_id: DEL,
             accounts: del::accounts::DeclareCandidacy {
                 candidate: m.kp.pubkey(),
                 governance: self.governance(DEL),
+                hub_dao: self.dao,
                 election: e,
-                voter: self.voter_pda(DEL, &m.kp.pubkey()),
+                pool: self.election(e).pool,
+                stake: Self::stake_pda(&self.election(e).pool, &m.kp.pubkey()),
+                stake_program: STAKE,
             }
             .to_account_metas(None),
-            data: del::instruction::DeclareCandidacy {}.data(),
+            data: del::instruction::DeclareCandidacy { seat }.data(),
         };
         self.send(&[ix], &[&m.kp])
     }
@@ -1109,9 +1270,12 @@ impl Env {
             accounts: del::accounts::VoteInElection {
                 owner: m.kp.pubkey(),
                 governance: self.governance(DEL),
+                hub_dao: self.dao,
                 election: e,
-                voter: self.voter_pda(DEL, &m.kp.pubkey()),
+                pool: self.election(e).pool,
+                stake: Self::stake_pda(&self.election(e).pool, &m.kp.pubkey()),
                 ballot,
+                stake_program: STAKE,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),
@@ -1123,7 +1287,7 @@ impl Env {
     pub fn finalize_election(&mut self, e: Pubkey) -> Result<(), FailedTransactionMetadata> {
         let ix = Instruction {
             program_id: DEL,
-            accounts: del::accounts::FinalizeElection { governance: self.governance(DEL), election: e }.to_account_metas(None),
+            accounts: del::accounts::FinalizeElection { governance: self.governance(DEL), election: e, randomness: None }.to_account_metas(None),
             data: del::instruction::FinalizeElection {}.data(),
         };
         let admin = self.admin.insecure_clone();
@@ -1138,7 +1302,10 @@ impl Env {
             accounts: del::accounts::InitiateRecall {
                 initiator: m.kp.pubkey(),
                 governance: self.governance(DEL),
-                voter: self.voter_pda(DEL, &m.kp.pubkey()),
+                hub_dao: self.dao,
+                dao_token: hub::dao_token_address(&self.dao),
+                pool: self.pool(),
+                stake: Self::stake_pda(&self.pool(), &m.kp.pubkey()),
                 recall,
                 system_program: SYSTEM,
             }
@@ -1155,9 +1322,12 @@ impl Env {
             accounts: del::accounts::VoteRecall {
                 owner: m.kp.pubkey(),
                 governance: self.governance(DEL),
+                hub_dao: self.dao,
                 recall: r,
-                voter: self.voter_pda(DEL, &m.kp.pubkey()),
+                pool: self.recall(r).pool,
+                stake: Self::stake_pda(&self.recall(r).pool, &m.kp.pubkey()),
                 recall_vote: record,
+                stake_program: STAKE,
                 system_program: SYSTEM,
             }
             .to_account_metas(None),

@@ -33,6 +33,11 @@ vortex-sortition = { path = "../programs/sortition", features = ["no-entrypoint"
 vortex-sowellian = { path = "../programs/sowellian", features = ["no-entrypoint"] }
 vortex-decision-markets = { path = "../programs/decision-markets", features = ["no-entrypoint"] }
 vortex-fill = { path = "../programs/fill", features = ["no-entrypoint"] }
+vortex-stake = { path = "../programs/stake", features = ["no-entrypoint"] }
+vortex-distribution = { path = "../programs/distribution", features = ["no-entrypoint"] }
+vortex-vault = { path = "../programs/vault", features = ["no-entrypoint"] }
 solana-account = "4.3.0"
 solana-sha256-hasher = "3.1.0"
 solana-instructions-sysvar = "3.0.1"
+# Phoenix's own account views, to check vortex-vault's fixed offsets against.
+phoenix-rise-accounts = "=0.9.3"

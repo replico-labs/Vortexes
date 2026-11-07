@@ -55,28 +55,7 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  114,
-                  101,
-                  97,
-                  115,
-                  117,
-                  114,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "dao"
-              }
-            ]
-          }
+          "signer": true
         },
         {
           "name": "dao",
@@ -84,6 +63,216 @@
         }
       ],
       "args": []
+    },
+    {
+      "name": "claim_allowance",
+      "docs": [
+        "The recipient claims this period's payment, paid by the treasury.",
+        "A period not claimed lapses: this only pays the period it's in."
+      ],
+      "discriminator": [
+        110,
+        225,
+        123,
+        234,
+        197,
+        163,
+        110,
+        176
+      ],
+      "accounts": [
+        {
+          "name": "recipient",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "dao"
+        },
+        {
+          "name": "allowance",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "docs": [
+            "and owns the token account for token ones."
+          ],
+          "writable": true
+        },
+        {
+          "name": "mint",
+          "optional": true
+        },
+        {
+          "name": "treasury_token",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "recipient_token",
+          "writable": true,
+          "optional": true
+        },
+        {
+          "name": "token_program",
+          "optional": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "clear_council",
+      "docs": [
+        "Turns the council off. Only a passed proposal, which the council",
+        "confirmed."
+      ],
+      "discriminator": [
+        228,
+        85,
+        87,
+        133,
+        134,
+        99,
+        197,
+        154
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "dao",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "council_confirm",
+      "docs": [
+        "A council signer confirms a waiting proposal. Approvals given under",
+        "an earlier council don't count: they start over."
+      ],
+      "discriminator": [
+        179,
+        111,
+        160,
+        166,
+        114,
+        246,
+        62,
+        105
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "dao"
+        },
+        {
+          "name": "waiting",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "council_reject",
+      "docs": [
+        "A council signer rejects a waiting proposal. Once confirming can no",
+        "longer reach the required count, it's rejected for good."
+      ],
+      "discriminator": [
+        78,
+        229,
+        179,
+        253,
+        100,
+        239,
+        252,
+        32
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "signer": true
+        },
+        {
+          "name": "dao"
+        },
+        {
+          "name": "waiting",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_allowance",
+      "docs": [
+        "Grants `recipient` `amount` of `mint` (None: SOL) every 30 days from",
+        "now until `ends_at`, at most a year away. Only a passed proposal (the",
+        "treasury signs and pays the rent); with a council on, that proposal",
+        "went through the council. Any number of allowances, for anyone."
+      ],
+      "discriminator": [
+        190,
+        211,
+        142,
+        34,
+        59,
+        121,
+        122,
+        141
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "docs": [
+            "The DAO's treasury: a passed proposal. It pays the rent."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "dao",
+          "writable": true
+        },
+        {
+          "name": "allowance",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "recipient",
+          "type": "pubkey"
+        },
+        {
+          "name": "mint",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "ends_at",
+          "type": "i64"
+        }
+      ]
     },
     {
       "name": "create_dao",
@@ -113,49 +302,14 @@
           "signer": true
         },
         {
-          "name": "model",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  111,
-                  100,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "governance_program"
-              }
-            ]
-          }
+          "name": "model"
         },
         {
           "name": "dao",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  97,
-                  111
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "create_key"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -195,28 +349,7 @@
           ]
         },
         {
-          "name": "executor",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  120,
-                  101,
-                  99,
-                  117,
-                  116,
-                  111,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "dao"
-              }
-            ]
-          }
+          "name": "executor"
         },
         {
           "name": "governance_program"
@@ -257,23 +390,10 @@
         },
         {
           "name": "hub",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  104,
-                  117,
-                  98
-                ]
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": []
@@ -281,7 +401,8 @@
     {
       "name": "propose_switch",
       "docs": [
-        "Starts a switch to another approved governance program. Needs the",
+        "Starts a switch to an approved governance program: another one, or a",
+        "fresh setup of the one running now (new rules or signers). Needs the",
         "treasury's signature, so only a passed proposal can call it."
       ],
       "discriminator": [
@@ -297,53 +418,14 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  114,
-                  101,
-                  97,
-                  115,
-                  117,
-                  114,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "dao"
-              }
-            ]
-          }
+          "signer": true
         },
         {
           "name": "dao",
           "writable": true
         },
         {
-          "name": "model",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  111,
-                  100,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "new_program"
-              }
-            ]
-          }
+          "name": "model"
         }
       ],
       "args": [
@@ -352,6 +434,74 @@
           "type": "pubkey"
         }
       ]
+    },
+    {
+      "name": "revoke_allowance",
+      "docs": [
+        "Ends an allowance now. Only a passed proposal."
+      ],
+      "discriminator": [
+        121,
+        114,
+        141,
+        153,
+        128,
+        164,
+        101,
+        113
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "dao"
+        },
+        {
+          "name": "allowance",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "run_confirmed",
+      "docs": [
+        "Runs a waiting proposal once the council has confirmed it. Anyone",
+        "can call it, with the same remaining accounts as `execute`. It must",
+        "still be the epoch the proposal was made in.",
+        "",
+        "Two cases need no confirmation: the council has been turned off",
+        "since, or the proposal only replaces the council's signers and",
+        "their tenure is over."
+      ],
+      "discriminator": [
+        58,
+        161,
+        155,
+        236,
+        153,
+        244,
+        63,
+        220
+      ],
+      "accounts": [
+        {
+          "name": "dao",
+          "docs": [
+            "Not `mut`: the proposal may change it (set_council, propose_switch)."
+          ]
+        },
+        {
+          "name": "waiting",
+          "writable": true
+        },
+        {
+          "name": "proposal"
+        }
+      ],
+      "args": []
     },
     {
       "name": "set_admin",
@@ -368,31 +518,119 @@
       "accounts": [
         {
           "name": "admin",
-          "signer": true,
-          "relations": [
-            "hub"
-          ]
+          "signer": true
         },
         {
           "name": "hub",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  104,
-                  117,
-                  98
-                ]
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": [
         {
           "name": "new_admin",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "set_council",
+      "docs": [
+        "Turns the council on, or replaces it: `signers`, `required` of them",
+        "to confirm, and a `tenure` (seconds) before the DAO can replace them",
+        "without their confirmation. Only a passed proposal (the treasury);",
+        "with a council on, that proposal went through the council, or",
+        "through the tenure rule."
+      ],
+      "discriminator": [
+        34,
+        228,
+        120,
+        49,
+        39,
+        179,
+        251,
+        154
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "dao",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "signers",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "required",
+          "type": "u8"
+        },
+        {
+          "name": "tenure",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "set_dao_token",
+      "docs": [
+        "Records the DAO's token and its stake pool (vortex-stake's",
+        "`[POOL_SEED, dao, mint]`). The creator records it once, after",
+        "create_dao and before setting up the first governance; after that",
+        "only a passed proposal (the treasury) can change it, for a deliberate",
+        "move to another token, with or without a switch."
+      ],
+      "discriminator": [
+        213,
+        50,
+        80,
+        210,
+        236,
+        22,
+        154,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "The creator (first record, before the first governance is set up)",
+            "or the treasury (a passed proposal)."
+          ],
+          "signer": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "dao"
+        },
+        {
+          "name": "governance",
+          "docs": [
+            "it has been set up yet."
+          ]
+        },
+        {
+          "name": "dao_token",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "mint",
           "type": "pubkey"
         }
       ]
@@ -416,51 +654,17 @@
         {
           "name": "admin",
           "writable": true,
-          "signer": true,
-          "relations": [
-            "hub"
-          ]
+          "signer": true
         },
         {
-          "name": "hub",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  104,
-                  117,
-                  98
-                ]
-              }
-            ]
-          }
+          "name": "hub"
         },
         {
           "name": "model",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  111,
-                  100,
-                  101,
-                  108
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "program_id"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
+          "name": "system_program"
         }
       ],
       "args": [
@@ -477,9 +681,111 @@
           "type": "bool"
         }
       ]
+    },
+    {
+      "name": "submit_to_council",
+      "docs": [
+        "While a council is on: confirms a passed proposal with the governance",
+        "program (which marks it executed, as `execute` would) and records it",
+        "as waiting for the council. Anyone can call it and pays for the record."
+      ],
+      "discriminator": [
+        126,
+        236,
+        71,
+        25,
+        194,
+        54,
+        26,
+        216
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "dao"
+        },
+        {
+          "name": "executor"
+        },
+        {
+          "name": "governance_program"
+        },
+        {
+          "name": "governance"
+        },
+        {
+          "name": "proposal",
+          "writable": true
+        },
+        {
+          "name": "waiting",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_allowance",
+      "docs": [
+        "Changes an allowance's amount and end (still at most a year from its",
+        "start). Periods already paid stay paid. Only a passed proposal."
+      ],
+      "discriminator": [
+        252,
+        57,
+        63,
+        230,
+        199,
+        109,
+        145,
+        26
+      ],
+      "accounts": [
+        {
+          "name": "treasury",
+          "signer": true
+        },
+        {
+          "name": "dao"
+        },
+        {
+          "name": "allowance",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "ends_at",
+          "type": "i64"
+        }
+      ]
     }
   ],
   "accounts": [
+    {
+      "name": "Allowance",
+      "discriminator": [
+        144,
+        8,
+        184,
+        213,
+        49,
+        248,
+        73,
+        131
+      ]
+    },
     {
       "name": "Dao",
       "discriminator": [
@@ -491,6 +797,19 @@
         85,
         197,
         49
+      ]
+    },
+    {
+      "name": "DaoToken",
+      "discriminator": [
+        184,
+        109,
+        82,
+        17,
+        243,
+        14,
+        52,
+        162
       ]
     },
     {
@@ -518,9 +837,113 @@
         223,
         151
       ]
+    },
+    {
+      "name": "Waiting",
+      "discriminator": [
+        114,
+        152,
+        56,
+        120,
+        78,
+        94,
+        151,
+        248
+      ]
     }
   ],
   "events": [
+    {
+      "name": "AllowanceClaimed",
+      "discriminator": [
+        52,
+        45,
+        139,
+        130,
+        87,
+        27,
+        177,
+        97
+      ]
+    },
+    {
+      "name": "AllowanceCreated",
+      "discriminator": [
+        94,
+        39,
+        221,
+        99,
+        199,
+        20,
+        181,
+        101
+      ]
+    },
+    {
+      "name": "AllowanceRevoked",
+      "discriminator": [
+        74,
+        142,
+        160,
+        182,
+        142,
+        17,
+        232,
+        199
+      ]
+    },
+    {
+      "name": "AllowanceUpdated",
+      "discriminator": [
+        153,
+        79,
+        112,
+        76,
+        24,
+        86,
+        188,
+        120
+      ]
+    },
+    {
+      "name": "CouncilCleared",
+      "discriminator": [
+        200,
+        120,
+        102,
+        54,
+        134,
+        149,
+        124,
+        241
+      ]
+    },
+    {
+      "name": "CouncilSet",
+      "discriminator": [
+        149,
+        61,
+        190,
+        191,
+        43,
+        225,
+        175,
+        118
+      ]
+    },
+    {
+      "name": "CouncilVoted",
+      "discriminator": [
+        165,
+        52,
+        161,
+        221,
+        234,
+        218,
+        249,
+        84
+      ]
+    },
     {
       "name": "DaoCreated",
       "discriminator": [
@@ -532,6 +955,19 @@
         59,
         188,
         88
+      ]
+    },
+    {
+      "name": "DaoTokenSet",
+      "discriminator": [
+        124,
+        66,
+        73,
+        98,
+        122,
+        2,
+        168,
+        36
       ]
     },
     {
@@ -558,6 +994,19 @@
         83,
         111,
         83
+      ]
+    },
+    {
+      "name": "SubmittedToCouncil",
+      "discriminator": [
+        66,
+        181,
+        149,
+        137,
+        115,
+        77,
+        253,
+        57
       ]
     },
     {
@@ -602,6 +1051,261 @@
   ],
   "types": [
     {
+      "name": "Allowance",
+      "docs": [
+        "A monthly allowance: `[ALLOWANCE_SEED, dao, id]`. The recipient claims",
+        "`amount` of `mint` (None: SOL) once per 30-day period from `start` until",
+        "`ends_at`; a period not claimed lapses."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "start",
+            "type": "i64"
+          },
+          {
+            "name": "ends_at",
+            "type": "i64"
+          },
+          {
+            "name": "paid_through",
+            "docs": [
+              "The last period paid, from 1 (0: none yet)."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "revoked",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AllowanceClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "allowance",
+            "type": "pubkey"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "period",
+            "type": "u64"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AllowanceCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "allowance",
+            "type": "pubkey"
+          },
+          {
+            "name": "id",
+            "type": "u64"
+          },
+          {
+            "name": "recipient",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "ends_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AllowanceRevoked",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "allowance",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AllowanceUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "allowance",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "ends_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Council",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "signers",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "required",
+            "docs": [
+              "How many signers must confirm."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "tenure",
+            "docs": [
+              "Seconds after `seated_at` before the DAO can replace the signers",
+              "without their confirmation."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "seated_at",
+            "type": "i64"
+          },
+          {
+            "name": "nonce",
+            "docs": [
+              "Goes up with every change, so approvals given to an earlier council",
+              "don't count."
+            ],
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CouncilCleared",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CouncilSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "signers",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "required",
+            "type": "u8"
+          },
+          {
+            "name": "tenure",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CouncilVoted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "waiting",
+            "type": "pubkey"
+          },
+          {
+            "name": "signer",
+            "type": "pubkey"
+          },
+          {
+            "name": "confirm",
+            "type": "bool"
+          },
+          {
+            "name": "approvals",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "Dao",
       "type": {
         "kind": "struct",
@@ -628,7 +1332,7 @@
           {
             "name": "governance",
             "docs": [
-              "The DAO's account in that program: `[GOVERNANCE_SEED, dao]` there."
+              "The DAO's account in that program: `[GOVERNANCE_SEED, dao, epoch]` there."
             ],
             "type": "pubkey"
           },
@@ -661,6 +1365,26 @@
           {
             "name": "executor_bump",
             "type": "u8"
+          },
+          {
+            "name": "council",
+            "docs": [
+              "The security council, when on."
+            ],
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Council"
+                }
+              }
+            }
+          },
+          {
+            "name": "allowance_count",
+            "docs": [
+              "How many allowances this DAO has granted (the latest id)."
+            ],
+            "type": "u64"
           }
         ]
       }
@@ -684,6 +1408,61 @@
           },
           {
             "name": "governance_program",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DaoToken",
+      "docs": [
+        "The DAO's token: `[TOKEN_SEED, dao]`. Members stake in `pool`, the",
+        "only pool that takes new stake, and token-based governance reads voting",
+        "power from it."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "pool",
+            "docs": [
+              "vortex-stake's pool for `mint`."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DaoTokenSet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "previous",
+            "docs": [
+              "`Pubkey::default()` when first recorded."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
             "type": "pubkey"
           }
         ]
@@ -789,6 +1568,26 @@
       }
     },
     {
+      "name": "SubmittedToCouncil",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "waiting",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
       "name": "SwitchApplied",
       "type": {
         "kind": "struct",
@@ -848,6 +1647,93 @@
           {
             "name": "ready_at",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Waiting",
+      "docs": [
+        "A passed proposal waiting for the council: `[WAITING_SEED, dao, proposal]`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dao",
+            "type": "pubkey"
+          },
+          {
+            "name": "proposal",
+            "type": "pubkey"
+          },
+          {
+            "name": "governance_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "epoch",
+            "type": "u32"
+          },
+          {
+            "name": "instructions_hash",
+            "docs": [
+              "Hash of the proposal's instructions when it was submitted."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "council_nonce",
+            "docs": [
+              "The council the votes below were given under."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "approvals",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "rejections",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "WaitingStatus"
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WaitingStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Waiting"
+          },
+          {
+            "name": "Rejected"
+          },
+          {
+            "name": "Done"
           }
         ]
       }

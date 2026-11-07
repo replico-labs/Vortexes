@@ -29,8 +29,9 @@ fn sow_config() -> SowellianConfig {
     }
 }
 
+/// Bonds and positions in the DAO's current token.
 fn escrow(env: &Env) -> Pubkey {
-    Pubkey::find_program_address(&[sow::ESCROW_SEED, env.governance(SOW).as_ref()], &SOW).0
+    Pubkey::find_program_address(&[sow::ESCROW_SEED, env.governance(SOW).as_ref(), env.mint.as_ref()], &SOW).0
 }
 
 fn pda(seed: &[u8], p: &Pubkey, owner: &Pubkey) -> Pubkey {
@@ -56,15 +57,11 @@ fn sowellian_dao() -> (Env, Member, Member) {
             payer: creator,
             hub_dao: env.dao,
             governance: env.governance(SOW),
-            mint: env.mint,
             dao_token: hub::dao_token_address(&env.dao),
-            vault: env.vault(SOW),
-            escrow: escrow(env),
-            token_program: env.token_program,
             system_program: SYSTEM,
         }
         .to_account_metas(None),
-        data: sow::instruction::InitGovernance { config: sow_config() }.data(),
+        data: sow::instruction::InitGovernance { epoch: env.governance_epoch(SOW), config: sow_config() }.data(),
     });
     let alice = env.member(1_000);
     let bob = env.member(800);
@@ -79,30 +76,11 @@ fn send(env: &mut Env, who: &Keypair, accounts: Vec<AccountMeta>, data: Vec<u8>)
 }
 
 fn deposit(env: &mut Env, m: &Member, amount: u64) -> Result<(), FailedTransactionMetadata> {
-    let a = sow::accounts::Deposit {
-        owner: m.kp.pubkey(),
-        governance: env.governance(SOW),
-        voter: env.voter_pda(SOW, &m.kp.pubkey()),
-        owner_token_account: m.ata,
-        vault: env.vault(SOW),
-        mint: env.mint,
-        token_program: env.token_program,
-        system_program: SYSTEM,
-    };
-    send(env, &m.kp, a.to_account_metas(None), sow::instruction::Deposit { amount }.data())
+    env.deposit(SOW, m, amount)
 }
 
 fn withdraw(env: &mut Env, m: &Member, amount: u64) -> Result<(), FailedTransactionMetadata> {
-    let a = sow::accounts::Withdraw {
-        owner: m.kp.pubkey(),
-        governance: env.governance(SOW),
-        voter: env.voter_pda(SOW, &m.kp.pubkey()),
-        owner_token_account: m.ata,
-        vault: env.vault(SOW),
-        mint: env.mint,
-        token_program: env.token_program,
-    };
-    send(env, &m.kp, a.to_account_metas(None), sow::instruction::Withdraw { amount }.data())
+    env.withdraw(SOW, m, amount)
 }
 
 fn human() -> Criteria {
@@ -120,6 +98,8 @@ fn propose(env: &mut Env, m: &Member, criteria: Criteria) -> Result<Pubkey, Fail
         proposer: m.kp.pubkey(),
         governance: env.governance(SOW),
         hub_dao: env.dao,
+        dao_token: hub::dao_token_address(&env.dao),
+        pool: env.pool(),
         proposal: p,
         proposer_token_account: m.ata,
         escrow: escrow(env),
@@ -133,12 +113,16 @@ fn propose(env: &mut Env, m: &Member, criteria: Criteria) -> Result<Pubkey, Fail
 
 fn approve_vote(env: &mut Env, m: &Member, p: Pubkey, choice: Choice) -> Result<(), FailedTransactionMetadata> {
     let o = m.kp.pubkey();
+    let pool = proposal(env, p).pool;
     let a = sow::accounts::CastApprovalVote {
         owner: o,
         governance: env.governance(SOW),
+        hub_dao: env.dao,
         proposal: p,
-        voter: env.voter_pda(SOW, &o),
+        pool,
+        stake: Env::stake_pda(&pool, &o),
         vote_record: pda(sow::APPROVAL_VOTE_SEED, &p, &o),
+        stake_program: STAKE,
         system_program: SYSTEM,
     };
     send(env, &m.kp, a.to_account_metas(None), sow::instruction::CastApprovalVote { choice }.data())
@@ -171,6 +155,7 @@ fn bond_action(env: &mut Env, m: &Member, p: Pubkey, data: Vec<u8>) -> Result<()
         owner: m.kp.pubkey(),
         governance: env.governance(SOW),
         proposal: p,
+        pool: proposal(env, p).pool,
         owner_token_account: m.ata,
         escrow: escrow(env),
         mint: env.mint,
@@ -181,12 +166,16 @@ fn bond_action(env: &mut Env, m: &Member, p: Pubkey, data: Vec<u8>) -> Result<()
 
 fn adjudicate(env: &mut Env, m: &Member, p: Pubkey, outcome: Outcome) -> Result<(), FailedTransactionMetadata> {
     let o = m.kp.pubkey();
+    let pool = proposal(env, p).pool;
     let a = sow::accounts::CastAdjudicationVote {
         owner: o,
         governance: env.governance(SOW),
+        hub_dao: env.dao,
         proposal: p,
-        voter: env.voter_pda(SOW, &o),
+        pool,
+        stake: Env::stake_pda(&pool, &o),
         vote_record: pda(sow::ADJUDICATION_VOTE_SEED, &p, &o),
+        stake_program: STAKE,
         system_program: SYSTEM,
     };
     send(env, &m.kp, a.to_account_metas(None), sow::instruction::CastAdjudicationVote { outcome }.data())
@@ -226,8 +215,8 @@ fn treasury_ata(env: &mut Env) -> Pubkey {
     CreateAssociatedTokenAccount::new(&mut env.svm, &creator, &mint).owner(&treasury).send().unwrap()
 }
 
-fn sweep(env: &mut Env, to: Pubkey) -> Result<(), FailedTransactionMetadata> {
-    let a = sow::accounts::SweepToTreasury { governance: env.governance(SOW), treasury_token_account: to, escrow: escrow(env), mint: env.mint, token_program: env.token_program };
+fn sweep(env: &mut Env, p: Pubkey, to: Pubkey) -> Result<(), FailedTransactionMetadata> {
+    let a = sow::accounts::SweepToTreasury { governance: env.governance(SOW), proposal: p, treasury_token_account: to, escrow: escrow(env), mint: env.mint, token_program: env.token_program };
     let admin = env.admin.insecure_clone();
     send(env, &admin, a.to_account_metas(None), sow::instruction::SweepToTreasury {}.data())
 }
@@ -327,11 +316,11 @@ fn a_challenge_goes_to_a_token_vote_and_the_wrong_side_loses_its_bond() {
     // 600 success of 1000: exactly the 60% threshold, so Success.
     let pr = proposal(&env, p);
     assert_eq!(pr.final_outcome, Outcome::Success);
-    assert_eq!((pr.owed_resolver, pr.owed_challenger, governance(&env).owed_treasury), (20, 0, 30), "challenger was wrong");
+    assert_eq!((pr.owed_resolver, pr.owed_challenger, proposal(&env, p).owed_treasury), (20, 0, 30), "challenger was wrong");
     let ta = treasury_ata(&mut env);
-    sweep(&mut env, ta).unwrap();
+    sweep(&mut env, p, ta).unwrap();
     assert_eq!(env.token_balance(&ta), 30);
-    assert_eq!(code(sweep(&mut env, ta)), err(GovError::NothingToClaim));
+    assert_eq!(code(sweep(&mut env, p, ta)), err(GovError::NothingToClaim));
 
     // Same again, but bob holds more weight: Failure, resolver loses.
     let (mut env, alice, bob) = sowellian_dao();
@@ -350,7 +339,7 @@ fn a_challenge_goes_to_a_token_vote_and_the_wrong_side_loses_its_bond() {
     settle(&mut env, p, sow::instruction::FinalizeAdjudication {}.data()).unwrap();
     let pr = proposal(&env, p);
     assert_eq!(pr.final_outcome, Outcome::Failure);
-    assert_eq!((pr.owed_resolver, pr.owed_challenger, governance(&env).owed_treasury), (0, 30, 20));
+    assert_eq!((pr.owed_resolver, pr.owed_challenger, proposal(&env, p).owed_treasury), (0, 30, 20));
     let b0 = env.token_balance(&bob.ata);
     claim_position(&mut env, &bob, p).unwrap();
     claim_bond(&mut env, &bob, p).unwrap();
@@ -397,7 +386,7 @@ fn rejection_sends_the_bond_to_the_treasury() {
     env.warp(START + 110);
     settle(&mut env, p, sow::instruction::FinalizeApproval {}.data()).unwrap();
     assert_eq!(proposal(&env, p).phase, Phase::Rejected);
-    assert_eq!(governance(&env).owed_treasury, 50);
+    assert_eq!(proposal(&env, p).owed_treasury, 50);
     assert_eq!(code(take(&mut env, &bob, p, Side::No, 10)), err(GovError::WrongPhase));
     assert_eq!(code(env.execute(SOW, p)), err(GovError::ProposalNotExecutable));
     assert_eq!(code(claim_bond(&mut env, &alice, p)), err(GovError::NothingToClaim));

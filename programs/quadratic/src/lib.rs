@@ -22,18 +22,8 @@ pub mod vortex_quadratic {
 
     /// Sets up a hub DAO in this program (creator after create_dao, or the
     /// treasury when switching to this model).
-    pub fn init_governance(ctx: Context<InitGovernance>, config: VotingConfig) -> Result<()> {
-        handlers::init_governance(ctx, config)
-    }
-
-    /// Deposits the DAO's token, adding voting power.
-    pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-        handlers::deposit(ctx, amount)
-    }
-
-    /// Withdraws a deposit once the proposals voted on have closed.
-    pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
-        handlers::withdraw(ctx, amount)
+    pub fn init_governance(ctx: Context<InitGovernance>, epoch: u32, config: VotingConfig) -> Result<()> {
+        handlers::init_governance(ctx, epoch, config)
     }
 
     /// Proposes instructions for the treasury to run if the vote passes.

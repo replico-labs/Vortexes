@@ -31,3 +31,4 @@ vortex-sortition = { path = "../../programs/sortition", features = ["no-entrypoi
 vortex-sowellian = { path = "../../programs/sowellian", features = ["no-entrypoint"] }
 vortex-decision-markets = { path = "../../programs/decision-markets", features = ["no-entrypoint"] }
 vortex-fill = { path = "../../programs/fill", features = ["no-entrypoint"] }
+vortex-stake = { path = "../../programs/stake", features = ["no-entrypoint"] }

@@ -21,8 +21,13 @@ struct Dm {
     quote_mint: Pubkey,
 }
 
-fn vault(env: &Env, seed: &[u8]) -> Pubkey {
-    Pubkey::find_program_address(&[seed, env.governance(DM).as_ref()], &DM).0
+fn quote_vault(env: &Env) -> Pubkey {
+    Pubkey::find_program_address(&[dm::QUOTE_VAULT_SEED, env.governance(DM).as_ref()], &DM).0
+}
+
+/// One base vault per token the DAO has used.
+fn base_vault(env: &Env, mint: &Pubkey) -> Pubkey {
+    Pubkey::find_program_address(&[dm::BASE_VAULT_SEED, env.governance(DM).as_ref(), mint.as_ref()], &DM).0
 }
 
 fn setup() -> Dm {
@@ -40,14 +45,14 @@ fn setup() -> Dm {
             base_mint: env.mint,
             dao_token: hub::dao_token_address(&env.dao),
             quote_mint,
-            base_vault: vault(env, dm::BASE_VAULT_SEED),
-            quote_vault: vault(env, dm::QUOTE_VAULT_SEED),
+            base_vault: base_vault(env, &env.mint),
+            quote_vault: quote_vault(env),
             base_token_program: env.token_program,
             quote_token_program: env.token_program,
             system_program: SYSTEM,
         }
         .to_account_metas(None),
-        data: dm::instruction::InitGovernance { config: dm_config() }.data(),
+        data: dm::instruction::InitGovernance { epoch: env.governance_epoch(DM), config: dm_config() }.data(),
     });
     env.svm.airdrop(&env.treasury, 5_000_000_000).unwrap();
     Dm { env, quote_mint }
@@ -67,8 +72,8 @@ impl Dm {
     fn tokens(&self) -> dm::accounts::Tokens {
         dm::accounts::Tokens {
             governance: self.env.governance(DM),
-            base_vault: vault(&self.env, dm::BASE_VAULT_SEED),
-            quote_vault: vault(&self.env, dm::QUOTE_VAULT_SEED),
+            base_vault: base_vault(&self.env, &self.env.mint),
+            quote_vault: quote_vault(&self.env),
             base_mint: self.env.mint,
             quote_mint: self.quote_mint,
             base_token_program: self.env.token_program,
@@ -101,6 +106,7 @@ impl Dm {
             proposer: t.kp.pubkey(),
             governance: self.env.governance(DM),
             hub_dao: self.env.dao,
+            dao_token: hub::dao_token_address(&self.env.dao),
             proposal: p,
             proposer_base: t.base,
             proposer_quote: t.quote,
@@ -171,7 +177,7 @@ impl Dm {
     }
 
     fn vaults(&self) -> (u64, u64) {
-        (self.env.token_balance(&vault(&self.env, dm::BASE_VAULT_SEED)), self.env.token_balance(&vault(&self.env, dm::QUOTE_VAULT_SEED)))
+        (self.env.token_balance(&base_vault(&self.env, &self.env.mint)), self.env.token_balance(&quote_vault(&self.env)))
     }
 }
 
@@ -293,4 +299,56 @@ fn merging_returns_the_underlying_and_cancelling_settles_as_failed() {
     assert_eq!((d.env.token_balance(&bob.base), d.env.token_balance(&bob.quote)), (500, 500), "bob whole again");
     assert_eq!((d.env.token_balance(&alice.base), d.env.token_balance(&alice.quote)), (1_000, 1_000), "alice's seed back");
     assert_eq!(d.vaults(), (0, 0));
+}
+
+#[test]
+fn after_a_token_change_new_proposals_trade_the_new_token_and_open_ones_keep_theirs() {
+    let mut d = setup();
+    let alice = d.trader(1_000, 1_000);
+    let old_mint = d.env.mint;
+    let open = d.propose(&alice, 200, 200).unwrap();
+
+    // The DAO changes its token (the hub's record, as a passed proposal would).
+    let creator = d.env.creator.insecure_clone();
+    let new_mint = CreateMint::new(&mut d.env.svm, &creator).decimals(6).send().unwrap();
+    let record = hub::dao_token_address(&d.env.dao);
+    let mut account = d.env.svm.get_account(&record).unwrap();
+    let mut t = hub::DaoToken::try_deserialize(&mut account.data.as_slice()).unwrap();
+    t.mint = new_mint;
+    t.pool = d.env.pool_for(new_mint);
+    let mut data = Vec::new();
+    anchor_lang::AccountSerialize::try_serialize(&t, &mut data).unwrap();
+    account.data[..data.len()].copy_from_slice(&data);
+    d.env.svm.set_account(record, account).unwrap();
+
+    // Until someone syncs, proposing on the old token is refused.
+    assert_eq!(code(d.propose(&alice, 200, 200)), err(GovError::WrongMint));
+    let sync = Instruction {
+        program_id: DM,
+        accounts: dm::accounts::SyncBaseToken {
+            payer: creator.pubkey(),
+            governance: d.env.governance(DM),
+            hub_dao: d.env.dao,
+            dao_token: record,
+            base_mint: new_mint,
+            base_vault: base_vault(&d.env, &new_mint),
+            base_token_program: d.env.token_program,
+            system_program: SYSTEM,
+        }
+        .to_account_metas(None),
+        data: dm::instruction::SyncBaseToken {}.data(),
+    };
+    d.env.send(&[sync.clone()], &[&creator]).unwrap();
+    assert!(d.env.send(&[sync], &[&creator]).is_err(), "already synced");
+    let g = dm::Governance::try_deserialize(&mut d.env.svm.get_account(&d.env.governance(DM)).unwrap().data.as_slice()).unwrap();
+    assert_eq!((g.base_mint, g.base_vault), (new_mint, base_vault(&d.env, &new_mint)));
+
+    // A trader with the new token proposes; the old proposal keeps the old vault.
+    d.env.mint = new_mint;
+    let bob = d.trader(1_000, 1_000);
+    let p = d.propose(&bob, 200, 200).unwrap();
+    assert_eq!((d.proposal(p).base_mint, d.proposal(p).base_vault), (new_mint, base_vault(&d.env, &new_mint)));
+    assert_eq!((d.proposal(open).base_mint, d.proposal(open).base_vault), (old_mint, base_vault(&d.env, &old_mint)));
+    assert_eq!(d.env.token_balance(&base_vault(&d.env, &old_mint)), 200);
+    assert_eq!(d.env.token_balance(&base_vault(&d.env, &new_mint)), 200);
 }
