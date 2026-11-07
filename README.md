@@ -217,6 +217,17 @@ The smoke test (below) also passes against a local `solana-test-validator` with 
 
 ## Deployment
 
+**One command** (with the deployer's program keypairs in `target/deploy/`):
+
+```bash
+WALLET=~/.config/solana/id.json bash scripts/deploy.sh                 # devnet
+WALLET=... CLUSTER=mainnet RPC_URL=<paid RPC> bash scripts/deploy.sh   # mainnet (asks to confirm)
+```
+
+It checks everything before sending anything: each program's `declare_id!`, the keypair of every program not deployed yet, the upgrade authority of every program already there, and the wallet's balance. Then it builds (`anchor build --ignore-keys -- --arch <v0|v3>`, the SBPF version read from the cluster), runs `cargo test`, deploys new programs and upgrades changed ones (unchanged ones are skipped, so a rerun picks up where it stopped), sets up the hub and approves the ten models, copies changed IDLs into `idl/` and prints the bot's settings. Options: `ONLY="vortex_vault vortex_hub"`, `BUILD=0`, `TEST=0`, `SMOKE=1` (full smoke test after), `ARCH=v3`.
+
+**SBPF version.** Agave 4.x clusters with SIMD-0500 active refuse to deploy SBPF v0–v2 programs (`cargo build-sbf`'s default is v0): the upload ends in "invalid account data for instruction". Build with `--arch v3` there; the script does this itself. All 132 tests pass with v3 builds.
+
 The program IDs in the code are the devnet deployment's below. To deploy your own copy, generate your own program keypairs and point the code at them:
 
 ```bash
