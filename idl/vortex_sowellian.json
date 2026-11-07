@@ -30,7 +30,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -62,31 +65,135 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
-          "name": "hub_dao"
+          "name": "hub_dao",
+          "relations": [
+            "governance"
+          ]
         },
         {
           "name": "proposal",
           "writable": true
         },
         {
-          "name": "pool"
+          "name": "pool",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "stake",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                95,
+                208,
+                123,
+                215,
+                131,
+                103,
+                251,
+                19,
+                207,
+                35,
+                238,
+                47,
+                6,
+                67,
+                147,
+                7,
+                217,
+                225,
+                204,
+                71,
+                148,
+                191,
+                24,
+                198,
+                113,
+                214,
+                70,
+                70,
+                182,
+                150,
+                159,
+                214
+              ]
+            }
+          }
         },
         {
           "name": "vote_record",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  106,
+                  117,
+                  100,
+                  105,
+                  99,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  118,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
         },
         {
-          "name": "stake_program"
+          "name": "stake_program",
+          "address": "7T27h8r13Xmp1m4vQbHFfs1xTqdQaHnxW7ybHvwjqKAd"
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -123,31 +230,131 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
-          "name": "hub_dao"
+          "name": "hub_dao",
+          "relations": [
+            "governance"
+          ]
         },
         {
           "name": "proposal",
           "writable": true
         },
         {
-          "name": "pool"
+          "name": "pool",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "stake",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  97,
+                  107,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                95,
+                208,
+                123,
+                215,
+                131,
+                103,
+                251,
+                19,
+                207,
+                35,
+                238,
+                47,
+                6,
+                67,
+                147,
+                7,
+                217,
+                225,
+                204,
+                71,
+                148,
+                191,
+                24,
+                198,
+                113,
+                214,
+                70,
+                70,
+                182,
+                150,
+                159,
+                214
+              ]
+            }
+          }
         },
         {
           "name": "vote_record",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  112,
+                  112,
+                  114,
+                  111,
+                  118,
+                  97,
+                  108,
+                  95,
+                  118,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
         },
         {
-          "name": "stake_program"
+          "name": "stake_program",
+          "address": "7T27h8r13Xmp1m4vQbHFfs1xTqdQaHnxW7ybHvwjqKAd"
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -182,7 +389,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -192,6 +402,9 @@
           "name": "pool",
           "docs": [
             "The proposal's pool: a challenge measures the vote's quorum against it."
+          ],
+          "relations": [
+            "proposal"
           ]
         },
         {
@@ -200,10 +413,36 @@
         },
         {
           "name": "escrow",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "mint"
+          "name": "mint",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "token_program"
@@ -232,7 +471,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -244,10 +486,36 @@
         },
         {
           "name": "escrow",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "mint"
+          "name": "mint",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "token_program"
@@ -277,14 +545,42 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal"
         },
         {
           "name": "position",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
         },
         {
           "name": "owner_token_account",
@@ -292,10 +588,36 @@
         },
         {
           "name": "escrow",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "mint"
+          "name": "mint",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "token_program"
@@ -326,7 +648,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -359,7 +684,10 @@
       "accounts": [
         {
           "name": "governance",
-          "writable": true
+          "writable": true,
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -386,7 +714,10 @@
       "accounts": [
         {
           "name": "governance",
-          "writable": true
+          "writable": true,
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -413,7 +744,10 @@
       "accounts": [
         {
           "name": "governance",
-          "writable": true
+          "writable": true,
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -454,17 +788,100 @@
         },
         {
           "name": "governance",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  118,
+                  101,
+                  114,
+                  110,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              },
+              {
+                "kind": "arg",
+                "path": "epoch"
+              }
+            ]
+          }
         },
         {
           "name": "dao_token",
           "docs": [
             "The DAO's token on record at the hub (set_dao_token): a token model",
             "needs one, as members stake it in the hub's pool."
-          ]
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -509,10 +926,68 @@
           "writable": true
         },
         {
-          "name": "hub_dao"
+          "name": "hub_dao",
+          "relations": [
+            "governance"
+          ]
         },
         {
-          "name": "dao_token"
+          "name": "dao_token",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "pool",
@@ -522,7 +997,32 @@
         },
         {
           "name": "proposal",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
         },
         {
           "name": "proposer_token_account",
@@ -530,16 +1030,43 @@
         },
         {
           "name": "escrow",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "mint"
+          "name": "mint",
+          "relations": [
+            "pool"
+          ]
         },
         {
           "name": "token_program"
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -592,7 +1119,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -602,6 +1132,9 @@
           "name": "pool",
           "docs": [
             "The proposal's pool: a challenge measures the vote's quorum against it."
+          ],
+          "relations": [
+            "proposal"
           ]
         },
         {
@@ -610,10 +1143,36 @@
         },
         {
           "name": "escrow",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "mint"
+          "name": "mint",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "token_program"
@@ -648,7 +1207,10 @@
       ],
       "accounts": [
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -677,7 +1239,10 @@
       ],
       "accounts": [
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -689,10 +1254,36 @@
         },
         {
           "name": "escrow",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "mint"
+          "name": "mint",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "token_program"
@@ -722,7 +1313,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -730,7 +1324,32 @@
         },
         {
           "name": "position",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
         },
         {
           "name": "owner_token_account",
@@ -738,16 +1357,43 @@
         },
         {
           "name": "escrow",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
         },
         {
-          "name": "mint"
+          "name": "mint",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "token_program"
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -820,7 +1466,10 @@
       "accounts": [
         {
           "name": "governance",
-          "writable": true
+          "writable": true,
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",

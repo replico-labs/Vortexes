@@ -61,7 +61,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -91,7 +94,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -122,7 +128,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -168,10 +177,38 @@
         },
         {
           "name": "governance",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  118,
+                  101,
+                  114,
+                  110,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              },
+              {
+                "kind": "arg",
+                "path": "epoch"
+              }
+            ]
+          }
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -222,14 +259,43 @@
           "writable": true
         },
         {
-          "name": "hub_dao"
+          "name": "hub_dao",
+          "relations": [
+            "governance"
+          ]
         },
         {
           "name": "proposal",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -308,7 +374,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",

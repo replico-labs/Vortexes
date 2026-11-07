@@ -30,7 +30,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -61,7 +64,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -92,7 +98,10 @@
       ],
       "accounts": [
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -133,7 +142,34 @@
         },
         {
           "name": "governance",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  111,
+                  118,
+                  101,
+                  114,
+                  110,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              },
+              {
+                "kind": "arg",
+                "path": "epoch"
+              }
+            ]
+          }
         },
         {
           "name": "base_mint"
@@ -143,18 +179,124 @@
           "docs": [
             "The DAO's token on record at the hub (set_dao_token): setting up -",
             "a switch included - only works with that mint."
-          ]
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "quote_mint"
         },
         {
           "name": "base_vault",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  115,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "base_mint"
+              }
+            ]
+          }
         },
         {
           "name": "quote_vault",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  113,
+                  117,
+                  111,
+                  116,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              }
+            ]
+          }
         },
         {
           "name": "base_token_program"
@@ -163,7 +305,8 @@
           "name": "quote_token_program"
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -202,7 +345,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -210,7 +356,32 @@
         },
         {
           "name": "position",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
         },
         {
           "name": "owner_base",
@@ -232,13 +403,19 @@
             },
             {
               "name": "quote_vault",
-              "writable": true
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
             },
             {
               "name": "base_mint"
             },
             {
-              "name": "quote_mint"
+              "name": "quote_mint",
+              "relations": [
+                "governance"
+              ]
             },
             {
               "name": "base_token_program"
@@ -288,17 +465,100 @@
           "writable": true
         },
         {
-          "name": "hub_dao"
+          "name": "hub_dao",
+          "relations": [
+            "governance"
+          ]
         },
         {
           "name": "dao_token",
           "docs": [
             "New proposals use the DAO's token on record: sync first after a change."
-          ]
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "proposal",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  112,
+                  111,
+                  115,
+                  97,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "arg",
+                "path": "id"
+              }
+            ]
+          }
         },
         {
           "name": "proposer_base",
@@ -320,13 +580,19 @@
             },
             {
               "name": "quote_vault",
-              "writable": true
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
             },
             {
               "name": "base_mint"
             },
             {
-              "name": "quote_mint"
+              "name": "quote_mint",
+              "relations": [
+                "governance"
+              ]
             },
             {
               "name": "base_token_program"
@@ -337,7 +603,8 @@
           ]
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -388,10 +655,16 @@
       "accounts": [
         {
           "name": "proposer",
-          "signer": true
+          "signer": true,
+          "relations": [
+            "proposal"
+          ]
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -417,13 +690,19 @@
             },
             {
               "name": "quote_vault",
-              "writable": true
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
             },
             {
               "name": "base_mint"
             },
             {
-              "name": "quote_mint"
+              "name": "quote_mint",
+              "relations": [
+                "governance"
+              ]
             },
             {
               "name": "base_token_program"
@@ -458,7 +737,10 @@
           "signer": true
         },
         {
-          "name": "governance"
+          "name": "governance",
+          "relations": [
+            "proposal"
+          ]
         },
         {
           "name": "proposal",
@@ -466,7 +748,32 @@
         },
         {
           "name": "position",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
         },
         {
           "name": "owner_base",
@@ -488,13 +795,19 @@
             },
             {
               "name": "quote_vault",
-              "writable": true
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
             },
             {
               "name": "base_mint"
             },
             {
-              "name": "quote_mint"
+              "name": "quote_mint",
+              "relations": [
+                "governance"
+              ]
             },
             {
               "name": "base_token_program"
@@ -535,7 +848,32 @@
         },
         {
           "name": "position",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
         },
         {
           "name": "owner_base",
@@ -557,13 +895,19 @@
             },
             {
               "name": "quote_vault",
-              "writable": true
+              "writable": true,
+              "relations": [
+                "governance"
+              ]
             },
             {
               "name": "base_mint"
             },
             {
-              "name": "quote_mint"
+              "name": "quote_mint",
+              "relations": [
+                "governance"
+              ]
             },
             {
               "name": "base_token_program"
@@ -574,7 +918,8 @@
           ]
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -616,10 +961,68 @@
           "writable": true
         },
         {
-          "name": "hub_dao"
+          "name": "hub_dao",
+          "relations": [
+            "governance"
+          ]
         },
         {
-          "name": "dao_token"
+          "name": "dao_token",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "base_mint",
@@ -629,13 +1032,41 @@
         },
         {
           "name": "base_vault",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  115,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "governance"
+              },
+              {
+                "kind": "account",
+                "path": "base_mint"
+              }
+            ]
+          }
         },
         {
           "name": "base_token_program"
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -667,7 +1098,32 @@
         },
         {
           "name": "position",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
         }
       ],
       "args": [

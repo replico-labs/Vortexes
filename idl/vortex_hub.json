@@ -55,7 +55,28 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
         },
         {
           "name": "dao",
@@ -84,10 +105,16 @@
         {
           "name": "recipient",
           "writable": true,
-          "signer": true
+          "signer": true,
+          "relations": [
+            "allowance"
+          ]
         },
         {
-          "name": "dao"
+          "name": "dao",
+          "relations": [
+            "allowance"
+          ]
         },
         {
           "name": "allowance",
@@ -98,7 +125,28 @@
           "docs": [
             "and owns the token account for token ones."
           ],
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
         },
         {
           "name": "mint",
@@ -119,7 +167,8 @@
           "optional": true
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -143,7 +192,28 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
         },
         {
           "name": "dao",
@@ -174,7 +244,10 @@
           "signer": true
         },
         {
-          "name": "dao"
+          "name": "dao",
+          "relations": [
+            "waiting"
+          ]
         },
         {
           "name": "waiting",
@@ -205,7 +278,10 @@
           "signer": true
         },
         {
-          "name": "dao"
+          "name": "dao",
+          "relations": [
+            "waiting"
+          ]
         },
         {
           "name": "waiting",
@@ -239,7 +315,28 @@
             "The DAO's treasury: a passed proposal. It pays the rent."
           ],
           "writable": true,
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
         },
         {
           "name": "dao",
@@ -250,7 +347,8 @@
           "writable": true
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -302,14 +400,49 @@
           "signer": true
         },
         {
-          "name": "model"
+          "name": "model",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  100,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "governance_program"
+              }
+            ]
+          }
         },
         {
           "name": "dao",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  97,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "create_key"
+              }
+            ]
+          }
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -349,7 +482,28 @@
           ]
         },
         {
-          "name": "executor"
+          "name": "executor",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  101,
+                  99,
+                  117,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
         },
         {
           "name": "governance_program"
@@ -390,10 +544,23 @@
         },
         {
           "name": "hub",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98
+                ]
+              }
+            ]
+          }
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -418,14 +585,53 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
         },
         {
           "name": "dao",
           "writable": true
         },
         {
-          "name": "model"
+          "name": "model",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  100,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "new_program"
+              }
+            ]
+          }
         }
       ],
       "args": [
@@ -453,10 +659,34 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
         },
         {
-          "name": "dao"
+          "name": "dao",
+          "relations": [
+            "allowance"
+          ]
         },
         {
           "name": "allowance",
@@ -491,6 +721,9 @@
           "name": "dao",
           "docs": [
             "Not `mut`: the proposal may change it (set_council, propose_switch)."
+          ],
+          "relations": [
+            "waiting"
           ]
         },
         {
@@ -498,7 +731,10 @@
           "writable": true
         },
         {
-          "name": "proposal"
+          "name": "proposal",
+          "relations": [
+            "waiting"
+          ]
         }
       ],
       "args": []
@@ -518,11 +754,26 @@
       "accounts": [
         {
           "name": "admin",
-          "signer": true
+          "signer": true,
+          "relations": [
+            "hub"
+          ]
         },
         {
           "name": "hub",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98
+                ]
+              }
+            ]
+          }
         }
       ],
       "args": [
@@ -554,7 +805,28 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
         },
         {
           "name": "dao",
@@ -622,10 +894,29 @@
         },
         {
           "name": "dao_token",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  111,
+                  107,
+                  101,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -654,17 +945,51 @@
         {
           "name": "admin",
           "writable": true,
-          "signer": true
+          "signer": true,
+          "relations": [
+            "hub"
+          ]
         },
         {
-          "name": "hub"
+          "name": "hub",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  117,
+                  98
+                ]
+              }
+            ]
+          }
         },
         {
           "name": "model",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  111,
+                  100,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "program_id"
+              }
+            ]
+          }
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -709,7 +1034,28 @@
           "name": "dao"
         },
         {
-          "name": "executor"
+          "name": "executor",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  101,
+                  99,
+                  117,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
         },
         {
           "name": "governance_program"
@@ -723,10 +1069,35 @@
         },
         {
           "name": "waiting",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  97,
+                  105,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              },
+              {
+                "kind": "account",
+                "path": "proposal"
+              }
+            ]
+          }
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -750,10 +1121,34 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dao"
+              }
+            ]
+          }
         },
         {
-          "name": "dao"
+          "name": "dao",
+          "relations": [
+            "allowance"
+          ]
         },
         {
           "name": "allowance",

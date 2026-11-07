@@ -30,11 +30,75 @@
         },
         {
           "name": "epoch",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  101,
+                  112,
+                  111,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "vault.epoch",
+                "account": "Vault"
+              }
+            ]
+          }
         },
         {
           "name": "request",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "vault.epoch",
+                "account": "Vault"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
         },
         {
           "name": "to",
@@ -75,11 +139,75 @@
         },
         {
           "name": "epoch",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  101,
+                  112,
+                  111,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "vault.epoch",
+                "account": "Vault"
+              }
+            ]
+          }
         },
         {
           "name": "request",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "vault.epoch",
+                "account": "Vault"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
         },
         {
           "name": "to",
@@ -191,7 +319,11 @@
       "accounts": [
         {
           "name": "vault",
-          "writable": true
+          "writable": true,
+          "relations": [
+            "epoch",
+            "request"
+          ]
         },
         {
           "name": "epoch"
@@ -234,7 +366,11 @@
       ],
       "accounts": [
         {
-          "name": "vault"
+          "name": "vault",
+          "relations": [
+            "epoch",
+            "request"
+          ]
         },
         {
           "name": "epoch"
@@ -298,7 +434,25 @@
         },
         {
           "name": "vault",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              }
+            ]
+          }
         },
         {
           "name": "share_mint",
@@ -309,11 +463,61 @@
         },
         {
           "name": "assets",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  115,
+                  115,
+                  101,
+                  116,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
         },
         {
           "name": "escrow",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              }
+            ]
+          }
         },
         {
           "name": "asset_token_program"
@@ -322,7 +526,8 @@
           "name": "share_token_program"
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -373,7 +578,66 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.dao",
+                "account": "Vault"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "vault",
@@ -405,7 +669,66 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.dao",
+                "account": "Vault"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "vault",
@@ -443,7 +766,36 @@
         },
         {
           "name": "epoch",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  101,
+                  112,
+                  111,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "vault.epoch",
+                "account": "Vault"
+              }
+            ]
+          }
         },
         {
           "name": "assets"
@@ -460,7 +812,8 @@
           "name": "share_token_program"
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -489,11 +842,75 @@
         },
         {
           "name": "epoch",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  101,
+                  112,
+                  111,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "vault.epoch",
+                "account": "Vault"
+              }
+            ]
+          }
         },
         {
           "name": "request",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "vault.epoch",
+                "account": "Vault"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
         },
         {
           "name": "allowed",
@@ -517,7 +934,8 @@
           "name": "asset_token_program"
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -553,11 +971,75 @@
         },
         {
           "name": "epoch",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  101,
+                  112,
+                  111,
+                  99,
+                  104
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "vault.epoch",
+                "account": "Vault"
+              }
+            ]
+          }
         },
         {
           "name": "request",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  114,
+                  101,
+                  113,
+                  117,
+                  101,
+                  115,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "account",
+                "path": "vault.epoch",
+                "account": "Vault"
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
         },
         {
           "name": "from",
@@ -574,7 +1056,8 @@
           "name": "share_token_program"
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -602,7 +1085,66 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.dao",
+                "account": "Vault"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "vault",
@@ -673,17 +1215,107 @@
         {
           "name": "treasury",
           "writable": true,
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.dao",
+                "account": "Vault"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "vault"
         },
         {
           "name": "allowed",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116,
+                  95,
+                  97,
+                  108,
+                  108,
+                  111,
+                  119,
+                  101,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault"
+              },
+              {
+                "kind": "arg",
+                "path": "who"
+              }
+            ]
+          }
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -712,7 +1344,66 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.dao",
+                "account": "Vault"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "vault",
@@ -748,7 +1439,66 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.dao",
+                "account": "Vault"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "vault",
@@ -790,7 +1540,66 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "vault.dao",
+                "account": "Vault"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "vault",

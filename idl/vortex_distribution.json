@@ -41,7 +41,66 @@
           "name": "treasury",
           "docs": [
             "The DAO's treasury: where the money goes, and nowhere else."
-          ]
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "raise.dao",
+                "account": "Raise"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "treasury_token",
@@ -79,7 +138,8 @@
         },
         {
           "name": "vault_program",
-          "optional": true
+          "optional": true,
+          "address": "GjVM1GkPEzXMRLsrP2FLr9UXJpXDVnwGVsVYbzTvtAU5"
         },
         {
           "name": "currency"
@@ -119,7 +179,66 @@
             "The DAO's treasury: a passed proposal. It pays the rent."
           ],
           "writable": true,
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "distributor.dao",
+                "account": "Distributor"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "distributor",
@@ -133,7 +252,8 @@
           "writable": true
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -190,7 +310,10 @@
         },
         {
           "name": "distributor",
-          "writable": true
+          "writable": true,
+          "relations": [
+            "allocation"
+          ]
         },
         {
           "name": "vault",
@@ -236,7 +359,10 @@
         },
         {
           "name": "distributor",
-          "writable": true
+          "writable": true,
+          "relations": [
+            "allocation"
+          ]
         },
         {
           "name": "vault",
@@ -278,7 +404,66 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "distributor.dao",
+                "account": "Distributor"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "distributor",
@@ -329,7 +514,36 @@
         },
         {
           "name": "contribution",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  105,
+                  98,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "raise"
+              },
+              {
+                "kind": "account",
+                "path": "contributor"
+              }
+            ]
+          }
         },
         {
           "name": "from",
@@ -346,7 +560,8 @@
           "name": "token_program"
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -395,17 +610,80 @@
         },
         {
           "name": "distributor",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  116,
+                  114,
+                  105,
+                  98,
+                  117,
+                  116,
+                  111,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              },
+              {
+                "kind": "arg",
+                "path": "operator"
+              }
+            ]
+          }
         },
         {
           "name": "vault",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  116,
+                  114,
+                  105,
+                  98,
+                  117,
+                  116,
+                  111,
+                  114,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "distributor"
+              }
+            ]
+          }
         },
         {
           "name": "token_program"
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -462,11 +740,57 @@
         },
         {
           "name": "raise",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  97,
+                  105,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "hub_dao"
+              },
+              {
+                "kind": "account",
+                "path": "create_key"
+              }
+            ]
+          }
         },
         {
           "name": "vault",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  97,
+                  105,
+                  115,
+                  101,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "raise"
+              }
+            ]
+          }
         },
         {
           "name": "prop_firm_vault",
@@ -479,7 +803,8 @@
           "name": "token_program"
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -545,7 +870,8 @@
           "writable": true
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -582,7 +908,66 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "distributor.dao",
+                "account": "Distributor"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "distributor",
@@ -624,7 +1009,66 @@
       "accounts": [
         {
           "name": "treasury",
-          "signer": true
+          "signer": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "distributor.dao",
+                "account": "Distributor"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                70,
+                189,
+                194,
+                34,
+                74,
+                135,
+                64,
+                159,
+                100,
+                73,
+                201,
+                85,
+                15,
+                216,
+                245,
+                80,
+                175,
+                196,
+                52,
+                211,
+                147,
+                173,
+                193,
+                149,
+                222,
+                67,
+                28,
+                48,
+                175,
+                252,
+                206,
+                177
+              ]
+            }
+          }
         },
         {
           "name": "distributor",
@@ -666,7 +1110,10 @@
           "signer": true
         },
         {
-          "name": "raise"
+          "name": "raise",
+          "relations": [
+            "contribution"
+          ]
         },
         {
           "name": "contribution",
@@ -684,7 +1131,8 @@
           "writable": true
         },
         {
-          "name": "system_program"
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -708,7 +1156,10 @@
       ],
       "accounts": [
         {
-          "name": "raise"
+          "name": "raise",
+          "relations": [
+            "contribution"
+          ]
         },
         {
           "name": "contribution",
