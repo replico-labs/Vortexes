@@ -89,7 +89,16 @@ WANT_FLAGS=${ARCH#v}
 
 if [ "$BUILD" != 0 ]; then
   echo "== build"
-  anchor build --ignore-keys -- --arch $ARCH
+  # anchor build for the IDLs (target/idl/); it passes its own --arch to cargo build-sbf, so
+  # the programs (and the test stubs) are then rebuilt for $ARCH with cargo build-sbf directly.
+  anchor build --ignore-keys
+  if [ "$ARCH" != v0 ]; then
+    for d in programs/* scripts/orao-stub scripts/hub-stub; do
+      echo "-- $d ($ARCH)"
+      OUT=$(cargo build-sbf --manifest-path $d/Cargo.toml --arch $ARCH --sbf-out-dir target/deploy 2>&1) \
+        || { echo "$OUT" | tail -30; fail "building $d for $ARCH failed"; }
+    done
+  fi
 fi
 if [ "$TEST" != 0 ]; then
   echo "== tests (LiteSVM)"
@@ -104,7 +113,7 @@ while read NAME ID; do
   SO=target/deploy/$NAME.so
   [ -f "$SO" ] || fail "$SO is missing (build first)"
   FLAGS=$(od -An -t u4 -j 48 -N 4 "$SO" | tr -d ' ')
-  [ "$FLAGS" = "$WANT_FLAGS" ] || fail "$SO is SBPF v$FLAGS, not $ARCH: rebuild (anchor build --ignore-keys -- --arch $ARCH)"
+  [ "$FLAGS" = "$WANT_FLAGS" ] || fail "$SO is SBPF v$FLAGS, not $ARCH: rebuild without BUILD=0, or cargo build-sbf --manifest-path programs/<name>/Cargo.toml --arch $ARCH --sbf-out-dir target/deploy"
   SHOW=$(show $ID)
   if [ -n "$SHOW" ]; then
     AUTH=$(echo "$SHOW" | awk '/^Authority:/ {print $2}')
